@@ -1,0 +1,74 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    name: macOS (AU / VST3 / Standalone, universal)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -G Xcode -DMODULEUR_COPY_AFTER_BUILD=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Ad-hoc sign
+        run: |
+          ART=build/ShmoerghModuleur_artefacts/Release
+          codesign --force --deep --sign - "$ART/AU/Moduleur.component"
+          codesign --force --deep --sign - "$ART/VST3/Moduleur.vst3"
+          codesign --force --deep --sign - "$ART/Standalone/Moduleur.app"
+
+      - name: Validate AU
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R build/ShmoerghModuleur_artefacts/Release/AU/Moduleur.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          auval -v aumu Mdlr Shmc
+
+      - name: Package
+        run: |
+          ART=build/ShmoerghModuleur_artefacts/Release
+          mkdir -p dist
+          ditto -c -k --keepParent "$ART/AU/Moduleur.component" dist/Moduleur-AU-macOS.zip
+          ditto -c -k --keepParent "$ART/VST3/Moduleur.vst3" dist/Moduleur-VST3-macOS.zip
+          ditto -c -k --keepParent "$ART/Standalone/Moduleur.app" dist/Moduleur-Standalone-macOS.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moduleur-macOS
+          path: dist/*.zip
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+
+  linux:
+    name: Linux (VST3 / Standalone + tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libasound2-dev libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
