@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 
 #include "Params.h"
@@ -61,6 +62,10 @@ public:
     // Switches the Brain firmware app (0 = MIDI to CV, 1 = Sequencer) from the UI.
     void requestBrainMode (int mode) { requestedBrainMode = mode; }
     void panic() { allNotesOffPending = true; }
+
+    // On-screen keyboard (shown by default in the standalone app)
+    juce::MidiKeyboardState keyboardState;
+    bool isStandalone() const { return wrapperType == wrapperType_Standalone; }
 
     // Brain buttons (momentary, not automatable)
     std::atomic<bool> buttonA { false }, buttonB { false };

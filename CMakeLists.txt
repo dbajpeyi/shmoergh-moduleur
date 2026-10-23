@@ -5,7 +5,14 @@ project(ShmoerghModuleur VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(APPLE)
+# iOS: configure with -G Xcode -DCMAKE_SYSTEM_NAME=iOS (see README).
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(MODULEUR_IOS ON)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum iOS version")
+    if(NOT CMAKE_OSX_ARCHITECTURES)
+        set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "" FORCE)
+    endif()
+elseif(APPLE)
     # Universal binary (Apple Silicon + Intel) unless the caller overrides it.
     if(NOT CMAKE_OSX_ARCHITECTURES)
         set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
@@ -25,11 +32,20 @@ FetchContent_Declare(JUCE
 FetchContent_MakeAvailable(JUCE)
 
 # On macOS, local builds install the AU and VST3 into ~/Library/Audio/Plug-Ins.
-option(MODULEUR_COPY_AFTER_BUILD "Copy plugins to the user plugin folders after building" ${APPLE})
+if(APPLE AND NOT MODULEUR_IOS)
+    set(MODULEUR_COPY_DEFAULT ON)
+else()
+    set(MODULEUR_COPY_DEFAULT OFF)
+endif()
+option(MODULEUR_COPY_AFTER_BUILD "Copy plugins to the user plugin folders after building" ${MODULEUR_COPY_DEFAULT})
 
-set(MODULEUR_FORMATS VST3 Standalone)
-if(APPLE)
-    list(APPEND MODULEUR_FORMATS AU)
+if(MODULEUR_IOS)
+    # The AUv3 is an app extension embedded in the standalone app.
+    set(MODULEUR_FORMATS AUv3 Standalone)
+elseif(APPLE)
+    set(MODULEUR_FORMATS VST3 AU Standalone)
+else()
+    set(MODULEUR_FORMATS VST3 Standalone)
 endif()
 
 juce_add_plugin(ShmoerghModuleur
@@ -48,7 +64,13 @@ juce_add_plugin(ShmoerghModuleur
     AU_MAIN_TYPE                kAudioUnitType_MusicDevice
     VST3_CATEGORIES             Instrument Synth
     MICROPHONE_PERMISSION_ENABLED TRUE
-    MICROPHONE_PERMISSION_TEXT  "The Moduleur can route audio input into its EXT jacks.")
+    MICROPHONE_PERMISSION_TEXT  "The Moduleur can route audio input into its HOST IN jacks."
+    # iOS only (ignored elsewhere)
+    IPHONE_SCREEN_ORIENTATIONS  UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    IPAD_SCREEN_ORIENTATIONS    UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    BACKGROUND_AUDIO_ENABLED    TRUE
+    REQUIRES_FULL_SCREEN        TRUE
+    STATUS_BAR_HIDDEN           TRUE)
 
 juce_add_binary_data(ModuleurAssets
     HEADER_NAME ModuleurAssets.h
@@ -87,7 +109,12 @@ target_link_libraries(ShmoerghModuleur
 # Headless DSP tests (no GUI): renders the default patch and checks the
 # output is sane. Run with `ctest`.
 # ---------------------------------------------------------------------------
-option(MODULEUR_BUILD_TESTS "Build DSP tests" ON)
+if(MODULEUR_IOS)
+    set(MODULEUR_TESTS_DEFAULT OFF)   # console apps can't run on iOS
+else()
+    set(MODULEUR_TESTS_DEFAULT ON)
+endif()
+option(MODULEUR_BUILD_TESTS "Build DSP tests" ${MODULEUR_TESTS_DEFAULT})
 if(MODULEUR_BUILD_TESTS)
     enable_testing()
     juce_add_console_app(ModuleurDspTest PRODUCT_NAME "ModuleurDspTest")

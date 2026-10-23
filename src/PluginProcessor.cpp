@@ -92,6 +92,8 @@ void ModuleurProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     if (scratch.getNumSamples() < numSamples)
         scratch.setSize (2, numSamples, false, false, true);
 
+    keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
+
     // --- controls ---
     float values[NumParams];
     for (int i = 0; i < NumParams; ++i)
