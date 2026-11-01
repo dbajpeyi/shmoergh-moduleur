@@ -32,6 +32,7 @@ const char* kHelp =
 ModuleurEditor::ModuleurEditor (ModuleurProcessor& p)
     : AudioProcessorEditor (p), processor (p), cables (p)
 {
+    setLookAndFeel (&lookAndFeel);
     content.setSize ((int) kPanelWidth, (int) kPanelHeight);
     content.onPopup = [this] (const juce::MouseEvent&) { showMenu(); };
     addAndMakeVisible (content);
@@ -160,6 +161,7 @@ ModuleurEditor::ModuleurEditor (ModuleurProcessor& p)
 
 ModuleurEditor::~ModuleurEditor()
 {
+    setLookAndFeel (nullptr);
     processor.buttonA = false;
     processor.buttonB = false;
 }
@@ -183,8 +185,10 @@ void ModuleurEditor::setScale (float s)
 
 void ModuleurEditor::applyTheme()
 {
-    const bool dark = processor.uiState.getProperty ("theme", "white").toString() == "black";
-    background.setTheme (dark ? Theme::black() : Theme::white());
+    const auto id = processor.uiState.getProperty ("theme", "original").toString();
+    lookAndFeel.theme = id == "white" ? Theme::white() : (id == "black" ? Theme::black() : Theme::original());
+    background.setTheme (lookAndFeel.theme);
+    content.repaint();
     cables.setOpacity ((float) processor.uiState.getProperty ("cableOpacity", 0.9f));
 }
 
@@ -328,14 +332,19 @@ void ModuleurEditor::jackReleased (Jack&, const juce::MouseEvent& e)
 void ModuleurEditor::showMenu()
 {
     juce::PopupMenu menu;
-    const bool dark = processor.uiState.getProperty ("theme", "white").toString() == "black";
+    const auto themeId = processor.uiState.getProperty ("theme", "original").toString();
     auto* defaultPatch = processor.apvts.getParameter ("default_patch");
     const bool boardFitted = defaultPatch->getValue() > 0.5f;
     const int brainMode = processor.brainModeForUi.load();
 
     juce::PopupMenu theme;
-    theme.addItem ("White FR4", true, ! dark, [this] { processor.uiState.setProperty ("theme", "white", nullptr); applyTheme(); });
-    theme.addItem ("Black FR4", true, dark, [this] { processor.uiState.setProperty ("theme", "black", nullptr); applyTheme(); });
+    auto addTheme = [this, &theme, &themeId] (const char* name, const char* id)
+    {
+        theme.addItem (name, true, themeId == id, [this, id] { processor.uiState.setProperty ("theme", id, nullptr); applyTheme(); });
+    };
+    addTheme ("Moduleur (black aluminium, white knobs)", "original");
+    addTheme ("White FR4 (DIY panel)", "white");
+    addTheme ("Black FR4 (DIY panel)", "black");
     menu.addSubMenu ("Panel", theme);
 
     juce::PopupMenu size;

@@ -14,12 +14,68 @@ struct Theme
     juce::Colour panel, print, copper, background;
     bool dark = false;
 
-    static Theme white() { return { juce::Colour (0xfff2f0e9), juce::Colour (0xff151515), juce::Colour (0xffc39a45), juce::Colour (0xff1c1c1c), false }; }
-    static Theme black() { return { juce::Colour (0xff171717), juce::Colour (0xfff1efe8), juce::Colour (0xffc9a24a), juce::Colour (0xff0d0d0d), true }; }
+    // Hardware fitted to the panel
+    juce::Colour knob, knobShade, knobLine;   // knob caps and their pointer line
+    juce::Colour accentKnob;                  // output level knobs (MIXER OUT, VOLUME)
+    juce::Colour sliderCap, sliderLine;
+    juce::Colour buttonCap;
+    bool blackJacks = false;                  // black or nickel jack nuts
+
+    // The built Moduleur: black powder-coated aluminium, grey print and hatching,
+    // white knobs with orange output levels, black jacks.
+    static Theme original()
+    {
+        Theme t;
+        t.panel = juce::Colour (0xff1c1c1e);
+        t.print = juce::Colour (0xff9a9a9b);
+        t.copper = juce::Colour (0xff4b4b4e);
+        t.background = juce::Colour (0xff0d0d0d);
+        t.dark = true;
+        t.knob = juce::Colour (0xfff2f1ed);
+        t.knobShade = juce::Colour (0xffb9b8b3);
+        t.knobLine = juce::Colour (0xff2b2b2b);
+        t.accentKnob = juce::Colour (0xffee6a28);
+        t.sliderCap = juce::Colour (0xfff2f1ed);
+        t.sliderLine = juce::Colour (0xff2b2b2b);
+        t.buttonCap = juce::Colour (0xffe4e3df);
+        t.blackJacks = true;
+        return t;
+    }
+
+    // DIY FR4 enclosure panels (exposed ENIG copper), with black knobs.
+    static Theme fr4 (bool blackBoard)
+    {
+        Theme t;
+        t.panel = blackBoard ? juce::Colour (0xff171717) : juce::Colour (0xfff2f0e9);
+        t.print = blackBoard ? juce::Colour (0xfff1efe8) : juce::Colour (0xff151515);
+        t.copper = blackBoard ? juce::Colour (0xffc9a24a) : juce::Colour (0xffc39a45);
+        t.background = blackBoard ? juce::Colour (0xff0d0d0d) : juce::Colour (0xff1c1c1c);
+        t.dark = blackBoard;
+        t.knob = juce::Colour (0xff2c2c2c);
+        t.knobShade = juce::Colour (0xff101010);
+        t.knobLine = juce::Colour (0xfff3f1ea);
+        t.accentKnob = t.knob;
+        t.sliderCap = juce::Colour (0xff2c2c2c);
+        t.sliderLine = juce::Colour (0xfff3f1ea);
+        t.buttonCap = juce::Colour (0xff2a2a2a);
+        t.blackJacks = false;
+        return t;
+    }
+
+    static Theme white() { return fr4 (false); }
+    static Theme black() { return fr4 (true); }
 };
 
+// The editor installs this LookAndFeel; controls read their colours from it.
+struct ThemeLookAndFeel : public juce::LookAndFeel_V4
+{
+    Theme theme = Theme::original();
+};
+
+const Theme& themeOf (const juce::Component&);
+
 //==============================================================================
-// Panel artwork: FR4 front panel with exposed copper (gold) and silkscreen.
+// Panel artwork: front panel with copper/hatching layer and print layer.
 class PanelBackground : public juce::Component
 {
 public:
@@ -29,7 +85,7 @@ public:
 
 private:
     std::unique_ptr<juce::Drawable> copper, silk;
-    Theme theme = Theme::white();
+    Theme theme = Theme::original();
 };
 
 //==============================================================================
@@ -165,6 +221,6 @@ private:
 
 // Decorative hardware (screws, DC barrel jack) drawn over the artwork.
 void drawScrew (juce::Graphics&, juce::Point<float> centre, float angle);
-void drawDcJack (juce::Graphics&, juce::Point<float> centre);
+void drawDcJack (juce::Graphics&, juce::Point<float> centre, const Theme&);
 juce::String describeValue (int paramIndex, float value);
 } // namespace moduleur::ui

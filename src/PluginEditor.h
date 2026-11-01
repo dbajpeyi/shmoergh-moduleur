@@ -43,6 +43,7 @@ private:
     void setScale (float s);
 
     ModuleurProcessor& processor;
+    moduleur::ui::ThemeLookAndFeel lookAndFeel;   // declared first: outlives the controls
     Content content;
     moduleur::ui::PanelBackground background;
     moduleur::ui::CableLayer cables;

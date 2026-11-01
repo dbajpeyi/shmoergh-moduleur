@@ -33,7 +33,31 @@ float positionToAngle (float pos)
     // PTV09 pots: 300 degrees of travel, centre pointing up.
     return juce::degreesToRadians (-150.0f + 300.0f * pos);
 }
+
+// Gradient-filled disc lit from the top left.
+void fillCap (juce::Graphics& g, juce::Point<float> c, float r, juce::Colour light, juce::Colour shade)
+{
+    juce::ColourGradient face (light, c.x - r * 0.7f, c.y - r * 0.9f, shade, c.x + r * 0.6f, c.y + r, false);
+    g.setGradientFill (face);
+    g.fillEllipse (c.x - r, c.y - r, r * 2, r * 2);
+}
+
+// Nut colours for jacks and panel hardware.
+juce::ColourGradient nutGradient (const Theme& t, juce::Point<float> c, float r)
+{
+    if (t.blackJacks)
+        return { juce::Colour (0xff3c3c3e), c.x - r, c.y - r, juce::Colour (0xff0b0b0c), c.x + r, c.y + r, false };
+    return { juce::Colour (0xfff0f0ed), c.x - r, c.y - r, juce::Colour (0xff8f8f8b), c.x + r, c.y + r, false };
+}
 } // namespace
+
+const Theme& themeOf (const juce::Component& c)
+{
+    static const Theme fallback = Theme::original();
+    if (auto* lf = dynamic_cast<const ThemeLookAndFeel*> (&c.getLookAndFeel()))
+        return lf->theme;
+    return fallback;
+}
 
 //==============================================================================
 PanelBackground::PanelBackground()
@@ -54,7 +78,7 @@ void PanelBackground::paint (juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
 
-    // FR4 board with a soft edge
+    // Board / powder-coated panel with a soft sheen
     g.setColour (theme.panel);
     g.fillRect (bounds);
     {
@@ -64,8 +88,8 @@ void PanelBackground::paint (juce::Graphics& g)
         g.fillRect (bounds);
     }
 
-    // Exposed copper (ENIG gold) and silkscreen. Both SVGs share the panel's
-    // 968 x 1210 viewBox.
+    // Copper layer (hatching, outlines) and print layer. Both SVGs share the
+    // panel's 968 x 1210 viewBox.
     const auto artBounds = juce::Rectangle<float> (0, 0, 968.0f, 1210.0f);
     if (copper != nullptr)
     {
@@ -100,7 +124,7 @@ void PanelBackground::paint (juce::Graphics& g)
     for (auto& s : screws)
         drawScrew (g, { s[0], s[1] }, 0.37f * (float) (i++ * 7 % 11));
 
-    drawDcJack (g, { 120.9f, 1149.0f });
+    drawDcJack (g, { 120.9f, 1149.0f }, theme);
 
     // Slider slots (PTA slide pots): dark slots cut in the board
     auto slot = [&] (float x, float y, float h)
@@ -108,7 +132,7 @@ void PanelBackground::paint (juce::Graphics& g)
         auto r = juce::Rectangle<float> (x - 5.3f, y - h * 0.5f, 10.6f, h);
         g.setColour (juce::Colour (0xff0b0b0b));
         g.fillRoundedRectangle (r, 5.3f);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.setColour (theme.dark ? juce::Colours::white.withAlpha (0.07f) : juce::Colours::black.withAlpha (0.5f));
         g.drawRoundedRectangle (r.expanded (0.5f), 5.8f, 1.0f);
     };
     slot (544.3f, 408.2f, 120.9f);
@@ -137,16 +161,15 @@ void drawScrew (juce::Graphics& g, juce::Point<float> c, float angle)
     g.strokePath (hex, juce::PathStrokeType (0.6f));
 }
 
-void drawDcJack (juce::Graphics& g, juce::Point<float> c)
+void drawDcJack (juce::Graphics& g, juce::Point<float> c, const Theme& t)
 {
     const float r = 19.0f;
     drawShadow (g, c, r, 2.0f, 0.3f);
     juce::Path nut;
     nut.addPolygon (c, 6, r, 0.2f);
-    juce::ColourGradient metal (juce::Colour (0xffe9e9e6), c.x - r, c.y - r, juce::Colour (0xff8d8d8a), c.x + r, c.y + r, false);
-    g.setGradientFill (metal);
+    g.setGradientFill (nutGradient (t, c, r));
     g.fillPath (nut);
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.setColour (t.blackJacks ? juce::Colours::white.withAlpha (0.08f) : juce::Colours::black.withAlpha (0.35f));
     g.strokePath (nut, juce::PathStrokeType (0.8f));
     g.setColour (juce::Colour (0xff1a1a1a));
     g.fillEllipse (centred ({ c.x, c.y, 0, 0 }, 22.0f));
@@ -173,16 +196,23 @@ juce::String Knob::getTextFromValue (double value)
 
 void Knob::paint (juce::Graphics& g)
 {
+    const auto& t = themeOf (*this);
     const auto bounds = getLocalBounds().toFloat();
     const auto c = bounds.getCentre();
     const float pos = (float) valueToProportionOfLength (getValue());
     const float angle = positionToAngle (pos);
 
+    // Output level knobs (MIXER OUT, VOLUME) are orange on the built Moduleur.
+    const bool accent = paramIndex == P_MIX_MAIN || paramIndex == P_VOLUME;
+    const auto cap = accent ? t.accentKnob : t.knob;
+    const auto shade = accent ? t.accentKnob.darker (0.45f) : t.knobShade;
+    const float shadowAlpha = t.dark ? 0.75f : 0.45f;
+
     if (kind == ControlKind::BigKnob)
     {
-        // Large 3D-printed knob: chunky grip skirt and a flat top with a pointer line.
+        // Large custom knob: gripped skirt and a flat top with a pointer line.
         const float r = kBigSize * 0.5f - 2.0f;
-        drawShadow (g, c, r, 4.0f, 0.45f);
+        drawShadow (g, c, r, 4.0f, shadowAlpha);
 
         juce::Path grip;
         const int ridges = 18;
@@ -194,30 +224,28 @@ void Knob::paint (juce::Graphics& g)
             if (i == 0) grip.startNewSubPath (p); else grip.lineTo (p);
         }
         grip.closeSubPath();
-        g.setColour (juce::Colour (0xff1b1b1b));
+        g.setColour (shade);
         g.fillPath (grip);
 
-        const float top = r * 0.80f;
-        juce::ColourGradient face (juce::Colour (0xff3a3a3a), c.x - top * 0.6f, c.y - top * 0.8f, juce::Colour (0xff141414), c.x + top * 0.6f, c.y + top, false);
-        g.setGradientFill (face);
-        g.fillEllipse (c.x - top, c.y - top, top * 2, top * 2);
-        g.setColour (juce::Colours::white.withAlpha (0.08f));
+        const float top = r * 0.82f;
+        fillCap (g, c, top, cap.brighter (0.08f), cap.interpolatedWith (shade, 0.55f));
+        g.setColour (juce::Colours::white.withAlpha (0.1f));
         g.drawEllipse (c.x - top + 0.5f, c.y - top + 0.5f, top * 2 - 1, top * 2 - 1, 1.0f);
 
-        g.setColour (juce::Colour (0xfff3f1ea));
+        g.setColour (t.knobLine);
         g.drawLine ({ c.getPointOnCircumference (top * 0.25f, angle), c.getPointOnCircumference (top * 0.92f, angle) }, 3.4f);
         return;
     }
 
     // Tall trimmer topper on a PTV09: knurled cylinder seen from above.
     const float r = kTrimmerSize * 0.5f - 1.5f;
-    drawShadow (g, c, r, 3.0f, 0.45f);
+    drawShadow (g, c, r, 3.0f, shadowAlpha);
 
-    g.setColour (juce::Colour (0xff101010));
+    g.setColour (shade);
     g.fillEllipse (c.x - r, c.y - r, r * 2, r * 2);
 
     const int ridges = 28;
-    g.setColour (juce::Colour (0xff3a3a3a));
+    g.setColour (shade.darker (0.5f).withAlpha (0.55f));
     for (int i = 0; i < ridges; ++i)
     {
         const float a = angle + juce::MathConstants<float>::twoPi * (float) i / (float) ridges;
@@ -225,11 +253,9 @@ void Knob::paint (juce::Graphics& g)
     }
 
     const float top = r - 3.4f;
-    juce::ColourGradient face (juce::Colour (0xff353535), c.x - top * 0.7f, c.y - top * 0.9f, juce::Colour (0xff121212), c.x + top * 0.6f, c.y + top, false);
-    g.setGradientFill (face);
-    g.fillEllipse (c.x - top, c.y - top, top * 2, top * 2);
+    fillCap (g, c, top, cap.brighter (0.08f), cap.interpolatedWith (shade, 0.6f));
 
-    g.setColour (juce::Colour (0xfff3f1ea));
+    g.setColour (t.knobLine);
     g.drawLine ({ c.getPointOnCircumference (top * 0.15f, angle), c.getPointOnCircumference (top * 0.95f, angle) }, 2.4f);
 }
 
@@ -249,6 +275,7 @@ juce::String Fader::getTextFromValue (double value)
 
 void Fader::paint (juce::Graphics& g)
 {
+    const auto& t = themeOf (*this);
     const auto b = getLocalBounds().toFloat();
     const float pos = (float) valueToProportionOfLength (getValue());
     const float capH = 40.0f, capW = 26.0f;
@@ -256,21 +283,22 @@ void Fader::paint (juce::Graphics& g)
     const float cy = yTop + (1.0f - pos) * travel;
     auto cap = juce::Rectangle<float> (b.getCentreX() - capW * 0.5f, cy - capH * 0.5f, capW, capH);
 
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.setColour (juce::Colours::black.withAlpha (t.dark ? 0.6f : 0.35f));
     g.fillRoundedRectangle (cap.translated (1.5f, 3.5f).expanded (1.5f), 4.0f);
 
-    juce::ColourGradient body (juce::Colour (0xff383838), cap.getX(), cap.getY(), juce::Colour (0xff111111), cap.getRight(), cap.getBottom(), false);
+    juce::ColourGradient body (t.sliderCap.brighter (0.08f), cap.getX(), cap.getY(),
+                               t.sliderCap.interpolatedWith (t.knobShade, 0.6f), cap.getRight(), cap.getBottom(), false);
     g.setGradientFill (body);
     g.fillRoundedRectangle (cap, 3.5f);
     // grip ridges
-    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    g.setColour (t.sliderLine.withAlpha (0.12f));
     for (int i = 1; i < 6; ++i)
     {
         const float y = cap.getY() + cap.getHeight() * (float) i / 6.0f;
         if (i != 3)
             g.drawLine (cap.getX() + 3.0f, y, cap.getRight() - 3.0f, y, 1.0f);
     }
-    g.setColour (juce::Colour (0xfff3f1ea));
+    g.setColour (t.sliderLine);
     g.fillRect (cap.getX() + 2.5f, cap.getCentreY() - 1.2f, cap.getWidth() - 5.0f, 2.4f);
 }
 
@@ -342,42 +370,43 @@ void WaveSelector::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWhe
 void WaveSelector::paint (juce::Graphics& g)
 {
     // The component is wider than the knob so the legends are clickable; the knob
-    // sits at the left.
+    // sits at the left. It is the Moduleur's custom selector knob: a round cap with
+    // a dished centre and a pointer tab.
+    const auto& t = themeOf (*this);
     const float size = Knob::kBigSize;
     const auto c = knobCentre();
     const float angle = kAngles[getIndex()] + juce::MathConstants<float>::halfPi; // juce: 0 = up
-    const float r = size * 0.5f - 2.0f;
-    drawShadow (g, c, r, 4.0f, 0.45f);
+    const float r = size * 0.5f - 6.0f;
 
-    // Fluted skirt (rotary switch knob)
-    juce::Path skirt;
-    const int flutes = 12;
-    for (int i = 0; i < flutes * 8; ++i)
-    {
-        const float a = angle + juce::MathConstants<float>::twoPi * (float) i / (float) (flutes * 8);
-        const float rr = r - 1.8f * (0.5f + 0.5f * std::cos ((float) i / 8.0f * juce::MathConstants<float>::twoPi));
-        const auto p = c.getPointOnCircumference (rr, a);
-        if (i == 0) skirt.startNewSubPath (p); else skirt.lineTo (p);
-    }
-    skirt.closeSubPath();
-    g.setColour (juce::Colour (0xff1b1b1b));
-    g.fillPath (skirt);
+    juce::Path body;
+    body.addEllipse (c.x - r, c.y - r, r * 2, r * 2);
+    juce::Path tab;
+    tab.startNewSubPath (c.getPointOnCircumference (r * 0.9f, angle - 0.42f));
+    tab.lineTo (c.getPointOnCircumference (r + 15.0f, angle));
+    tab.lineTo (c.getPointOnCircumference (r * 0.9f, angle + 0.42f));
+    tab.closeSubPath();
+    body.addPath (tab.createPathWithRoundedCorners (5.0f));
 
-    const float top = r * 0.80f;
-    juce::ColourGradient face (juce::Colour (0xff3a3a3a), c.x - top * 0.6f, c.y - top * 0.8f, juce::Colour (0xff141414), c.x + top * 0.6f, c.y + top, false);
+    juce::DropShadow (juce::Colours::black.withAlpha (t.dark ? 0.8f : 0.5f), 14, { 2, 5 }).drawForPath (g, body);
+
+    juce::ColourGradient face (t.knob.brighter (0.08f), c.x - r * 0.7f, c.y - r * 0.9f,
+                               t.knob.interpolatedWith (t.knobShade, 0.6f), c.x + r * 0.6f, c.y + r, false);
     g.setGradientFill (face);
-    g.fillEllipse (c.x - top, c.y - top, top * 2, top * 2);
+    g.fillPath (body);
+    g.setColour (t.knobShade.darker (0.3f).withAlpha (0.6f));
+    g.strokePath (body, juce::PathStrokeType (1.0f));
 
-    // Pointer: a raised bar across the face, with a white tip
-    juce::Path bar;
-    bar.addRoundedRectangle (-5.0f, -top * 0.98f, 10.0f, top * 1.96f, 4.0f);
-    bar.applyTransform (juce::AffineTransform::rotation (angle).translated (c));
-    g.setColour (juce::Colour (0xff242424));
-    g.fillPath (bar);
-    g.setColour (juce::Colours::white.withAlpha (0.06f));
-    g.strokePath (bar, juce::PathStrokeType (1.0f));
-    g.setColour (juce::Colour (0xfff3f1ea));
-    g.drawLine ({ c.getPointOnCircumference (top * 0.45f, angle), c.getPointOnCircumference (top * 0.92f, angle) }, 3.0f);
+    // Dished centre (inner shadow at the top left, highlight at the bottom right)
+    const float dish = r * 0.52f;
+    juce::ColourGradient bowl (t.knobShade.darker (0.15f), c.x - dish, c.y - dish, t.knob.brighter (0.05f), c.x + dish, c.y + dish, false);
+    g.setGradientFill (bowl);
+    g.fillEllipse (c.x - dish, c.y - dish, dish * 2, dish * 2);
+    g.setColour (t.knobShade.darker (0.35f).withAlpha (0.5f));
+    g.drawEllipse (c.x - dish, c.y - dish, dish * 2, dish * 2, 1.0f);
+
+    // Pointer line along the tab
+    g.setColour (t.knobLine.withAlpha (0.85f));
+    g.drawLine ({ c.getPointOnCircumference (r * 0.7f, angle), c.getPointOnCircumference (r + 9.0f, angle) }, 2.6f);
 }
 
 //==============================================================================
@@ -399,12 +428,13 @@ void PushButton::mouseUp (const juce::MouseEvent&)
 
 void PushButton::paint (juce::Graphics& g)
 {
+    const auto& t = themeOf (*this);
     const auto c = getLocalBounds().toFloat().getCentre();
     const bool down = state.load();
     const float r = 18.5f;
 
     // Bezel
-    drawShadow (g, c, r, down ? 1.5f : 3.0f, 0.4f);
+    drawShadow (g, c, r, down ? 1.5f : 3.0f, t.dark ? 0.7f : 0.4f);
     juce::ColourGradient bezel (juce::Colour (0xff2c2c2c), c.x - r, c.y - r, juce::Colour (0xff080808), c.x + r, c.y + r, false);
     g.setGradientFill (bezel);
     g.fillEllipse (c.x - r, c.y - r, r * 2, r * 2);
@@ -423,11 +453,9 @@ void PushButton::paint (juce::Graphics& g)
     }
 
     const float cap = r - 5.0f;
-    juce::ColourGradient face (down ? juce::Colour (0xff141414) : juce::Colour (0xff303030), c.x - cap * 0.6f, c.y - cap * 0.8f,
-                               down ? juce::Colour (0xff222222) : juce::Colour (0xff101010), c.x + cap * 0.6f, c.y + cap, false);
-    g.setGradientFill (face);
-    g.fillEllipse (c.x - cap, c.y - cap, cap * 2, cap * 2);
-    g.setColour (juce::Colours::white.withAlpha (down ? 0.03f : 0.08f));
+    const auto capColour = down ? t.buttonCap.darker (0.25f) : t.buttonCap;
+    fillCap (g, c, cap, down ? capColour.darker (0.1f) : capColour.brighter (0.08f), capColour.interpolatedWith (t.knobShade, down ? 0.2f : 0.6f));
+    g.setColour (juce::Colours::white.withAlpha (down ? 0.03f : 0.1f));
     g.drawEllipse (c.x - cap + 0.5f, c.y - cap + 0.5f, cap * 2 - 1, cap * 2 - 1, 1.0f);
 }
 
@@ -447,21 +475,19 @@ void PowerButton::mouseDown (const juce::MouseEvent& e)
 
 void PowerButton::paint (juce::Graphics& g)
 {
+    const auto& t = themeOf (*this);
     const auto c = getLocalBounds().toFloat().getCentre();
     const float r = 20.5f;
     drawShadow (g, c, r, 3.0f, 0.4f);
     juce::Path nut;
     nut.addPolygon (c, 6, r, 0.0f);
-    juce::ColourGradient metal (juce::Colour (0xffe9e9e6), c.x - r, c.y - r, juce::Colour (0xff8d8d8a), c.x + r, c.y + r, false);
-    g.setGradientFill (metal);
+    g.setGradientFill (nutGradient (t, c, r));
     g.fillPath (nut);
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.setColour (t.blackJacks ? juce::Colours::white.withAlpha (0.08f) : juce::Colours::black.withAlpha (0.35f));
     g.strokePath (nut, juce::PathStrokeType (0.8f));
 
     const float cap = on ? 12.5f : 13.5f;
-    juce::ColourGradient face (juce::Colour (0xff303030), c.x - cap * 0.6f, c.y - cap * 0.8f, juce::Colour (0xff0c0c0c), c.x + cap * 0.6f, c.y + cap, false);
-    g.setGradientFill (face);
-    g.fillEllipse (c.x - cap, c.y - cap, cap * 2, cap * 2);
+    fillCap (g, c, cap, juce::Colour (0xff303030), juce::Colour (0xff0c0c0c));
 }
 
 //==============================================================================
@@ -510,29 +536,37 @@ void Jack::mouseUp (const juce::MouseEvent& e) { if (patchable && listener) list
 
 void Jack::paint (juce::Graphics& g)
 {
+    const auto& t = themeOf (*this);
     const auto c = getLocalBounds().toFloat().getCentre();
     const float r = 13.5f;
-    drawShadow (g, c, r, 2.0f, 0.35f);
+    drawShadow (g, c, r, 2.0f, t.dark ? 0.6f : 0.35f);
 
     // Knurled nut
-    juce::ColourGradient metal (juce::Colour (0xfff0f0ed), c.x - r, c.y - r, juce::Colour (0xff8f8f8b), c.x + r, c.y + r, false);
-    g.setGradientFill (metal);
+    g.setGradientFill (nutGradient (t, c, r));
     g.fillEllipse (c.x - r, c.y - r, r * 2, r * 2);
-    g.setColour (juce::Colours::black.withAlpha (0.16f));
+    g.setColour (t.blackJacks ? juce::Colours::white.withAlpha (0.07f) : juce::Colours::black.withAlpha (0.16f));
     for (int i = 0; i < 36; ++i)
     {
         const float a = juce::MathConstants<float>::twoPi * (float) i / 36.0f;
         g.drawLine ({ c.getPointOnCircumference (r - 2.2f, a), c.getPointOnCircumference (r - 0.3f, a) }, 0.7f);
     }
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.setColour (t.blackJacks ? juce::Colours::white.withAlpha (0.1f) : juce::Colours::black.withAlpha (0.35f));
     g.drawEllipse (c.x - r, c.y - r, r * 2, r * 2, 0.7f);
 
     const float inner = 8.2f;
-    juce::ColourGradient bush (juce::Colour (0xffc8c8c4), c.x - inner, c.y - inner, juce::Colour (0xff7a7a76), c.x + inner, c.y + inner, false);
-    g.setGradientFill (bush);
+    if (t.blackJacks)
+    {
+        juce::ColourGradient bush (juce::Colour (0xff2e2e30), c.x - inner, c.y - inner, juce::Colour (0xff101011), c.x + inner, c.y + inner, false);
+        g.setGradientFill (bush);
+    }
+    else
+    {
+        juce::ColourGradient bush (juce::Colour (0xffc8c8c4), c.x - inner, c.y - inner, juce::Colour (0xff7a7a76), c.x + inner, c.y + inner, false);
+        g.setGradientFill (bush);
+    }
     g.fillEllipse (c.x - inner, c.y - inner, inner * 2, inner * 2);
 
-    g.setColour (juce::Colour (0xff060606));
+    g.setColour (juce::Colour (0xff030303));
     g.fillEllipse (c.x - 5.0f, c.y - 5.0f, 10.0f, 10.0f);
 
     if (highlighted || (hover && patchable))
