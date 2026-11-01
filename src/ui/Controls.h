@@ -24,11 +24,46 @@ inline constexpr float kPanelOriginY = 187.0f * kPtToPanel;
 #endif
 inline constexpr bool kPanelThemesEnabled = MODULEUR_PANEL_THEMES != 0;
 
+// Colours of the design's flat parts, per appearance.
+struct DesignPalette
+{
+    juce::Colour panel, ring, cap, pointer, hole, outline, button1, button2, buttonDown,
+                 powerOn, powerOff, ledOn, ledOff, highlight;
+    float cableShadow = 0.45f;
+
+    // Dark: the Figma design as drawn.
+    static DesignPalette dark()
+    {
+        DesignPalette p;
+        p.panel = juce::Colour (0xff252527); p.ring = juce::Colours::black; p.cap = juce::Colours::white;
+        p.pointer = juce::Colour (0xff111111); p.hole = p.panel; p.outline = juce::Colours::transparentBlack;
+        p.button1 = p.button2 = juce::Colour (0xffbfbfbf); p.buttonDown = juce::Colour (0xff8f8f8f);
+        p.powerOn = juce::Colour (0xffb7b7b7); p.powerOff = juce::Colour (0xff6b6b6b);
+        p.ledOn = juce::Colour (0xffff0000); p.ledOff = juce::Colour (0xff361819); p.highlight = juce::Colours::white;
+        return p;
+    }
+
+    // Light: the white hardware, drawn flat (navy hardware, dark print).
+    static DesignPalette light()
+    {
+        DesignPalette p;
+        p.panel = juce::Colour (0xffeeeeec); p.ring = juce::Colour (0xff0b1630); p.cap = juce::Colour (0xfffafaf8);
+        p.pointer = juce::Colour (0xff0b1630); p.hole = p.ring; p.outline = juce::Colour (0xff13192b);
+        p.button1 = juce::Colour (0xfffafaf8); p.button2 = juce::Colour (0xff0b1630); p.buttonDown = juce::Colour (0xff9aa1ad);
+        p.powerOn = juce::Colour (0xff0b1630); p.powerOff = juce::Colour (0xff8a909b);
+        p.ledOn = juce::Colour (0xffe8231c); p.ledOff = juce::Colour (0xff6e7072); p.highlight = juce::Colour (0xff13192b);
+        p.cableShadow = 0.22f;
+        return p;
+    }
+};
+
 struct Theme
 {
     juce::Colour panel, print, copper, background;
     bool dark = false;
     bool design = false;                      // flat parts of the Figma design
+    bool light = false;                       // light appearance of the design
+    DesignPalette palette = DesignPalette::dark();
 
     // Hardware fitted to the panel
     juce::Colour knob, knobShade, knobLine;   // knob caps and their pointer line
@@ -93,15 +128,25 @@ struct Theme
         t.design = true;
         return t;
     }
+
+    // Light appearance: the white Moduleur with red, green and navy blocks.
+    static Theme figmaLight()
+    {
+        Theme t = figma();
+        t.panel = juce::Colour (0xffeeeeec);
+        t.print = juce::Colour (0xff13192b);
+        t.copper = juce::Colour (0xffc9cccf);
+        t.background = juce::Colour (0xfff8f8f7);
+        t.dark = false;
+        t.light = true;
+        t.palette = DesignPalette::light();
+        return t;
+    }
 };
 
-// Colours of the design's flat parts.
-namespace design
-{
-inline const juce::Colour kPanel { 0xff252527 }, kRing { 0xff000000 }, kCap { 0xffffffff }, kPointer { 0xff111111 },
-                          kOrange { 0xffff8700 }, kLedOn { 0xffff0000 }, kLedOff { 0xff361819 },
-                          kButton { 0xffbfbfbf }, kButtonDown { 0xff8f8f8f }, kPowerOn { 0xffb7b7b7 }, kPowerOff { 0xff6b6b6b };
-} // namespace design
+// Cap and pointer colours of a design knob.
+struct KnobColours { juce::Colour cap, pointer; };
+KnobColours knobColours (const Theme&, int paramIndex);
 
 // The editor installs this LookAndFeel; controls read their colours from it.
 struct ThemeLookAndFeel : public juce::LookAndFeel_V4
@@ -118,10 +163,12 @@ class StageBackground : public juce::Component
 {
 public:
     StageBackground();
+    void setLight (bool light);
     void paint (juce::Graphics&) override;
 
 private:
-    juce::Image image;
+    juce::Image dark, light;
+    bool useLight = false;
 };
 
 //==============================================================================

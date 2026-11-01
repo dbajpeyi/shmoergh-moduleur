@@ -4,11 +4,18 @@ import sys
 import numpy as np
 from PIL import Image
 
+# Usage: python3 host-labels.py <stage-raw.png> <out.png> [dark|light]
 src, dst = sys.argv[1], sys.argv[2]
+mode = sys.argv[3] if len(sys.argv) > 3 else 'dark'
 K = 3.0                                      # render scale (px per pt)
 img = np.asarray(Image.open(src).convert('RGB')).astype(np.float32)
-BG = np.array([0x25, 0x25, 0x27], np.float32)
-INK = np.array([0x9A, 0x9A, 0x9C], np.float32)
+rgb = lambda h: np.array([int(h[i:i + 2], 16) for i in (1, 3, 5)], np.float32)
+if mode == 'light':
+    BG, INK = rgb('#EEEEEC'), rgb('#13192B')           # letters are cut from dark-on-white labels
+    DST_BG, DST_INK = rgb('#0B1A36'), rgb('#F4F4F2')   # set white on the navy strip
+else:
+    BG, INK = rgb('#252527'), rgb('#9A9A9C')
+    DST_BG, DST_INK = BG, INK                          # knockout on the hatching
 
 # letter -> (glyph x, baseline y, advance) taken from labels on plain panel areas
 letters = {
@@ -37,7 +44,7 @@ def put(text, centre_x, base):
     # plain knockout behind labels on hatching: 2 pt either side, baseline-14 .. +5
     kx0, kx1 = int(round((x - 2) * K)), int(round((x + width + 2) * K))
     ky0, ky1 = int(round((base - 14) * K)), int(round((base + 5) * K))
-    out[ky0:ky1, kx0:kx1] = BG
+    out[ky0:ky1, kx0:kx1] = DST_BG
     for c in text:
         if c == ' ':
             x += space
@@ -46,7 +53,7 @@ def put(text, centre_x, base):
         x0, y0 = int(round(x * K)), int(round((base - ASC) * K))
         h, w = a.shape
         region = out[y0:y0 + h, x0:x0 + w]
-        region[:] = region * (1 - a[..., None]) + INK * a[..., None]
+        region[:] = region * (1 - a[..., None]) + DST_INK * a[..., None]
         x += letters[c][2]
 
 put('HOST L', 380.0, 1455.0)

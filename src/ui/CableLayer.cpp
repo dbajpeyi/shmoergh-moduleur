@@ -110,7 +110,8 @@ void CableLayer::paint (juce::Graphics& g)
 
         const float plugR = 16.0f * kPtToPanel;
         const juce::PathStrokeType stroke (10.0f * kPtToPanel, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-        const juce::DropShadow shadow (juce::Colours::black.withAlpha (0.45f * opacity), juce::roundToInt (9.0f * kPtToPanel), { 2, 4 });
+        const juce::DropShadow shadow (juce::Colours::black.withAlpha (themeOf (*this).palette.cableShadow * opacity),
+                                       juce::roundToInt (9.0f * kPtToPanel), { 2, 4 });
 
         for (size_t i = 0; i < wires.size(); ++i)
         {
