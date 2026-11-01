@@ -92,6 +92,8 @@ private:
     std::atomic<bool> brainSettingsPending { false };
     std::atomic<bool> allNotesOffPending { false };
     std::atomic<int> requestedBrainMode { -1 };
+    double rackSampleRate = 96000.0;
+    bool needsRackReset = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModuleurProcessor)
 };

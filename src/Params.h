@@ -74,9 +74,9 @@ inline constexpr std::array<ParamDef, NumParams> kParams {{
     { "lfo_amount",   "LFO Amount",          ControlKind::Trimmer,   0.8f,  604.7f, 786.1f },
     { "drive",        "Drive",               ControlKind::Trimmer,   0.2f, 665.2f, 786.1f },
 
-    { "brain_x",      "Brain X",             ControlKind::Trimmer,   0.335f,  786.1f, 695.4f },
-    { "brain_y",      "Brain Y",             ControlKind::Trimmer,   0.5f,  846.6f, 695.4f },
-    { "brain_z",      "Brain Z",             ControlKind::Trimmer,   0.0f,  907.1f, 695.4f },
+    { "brain_x",      "Brain A",             ControlKind::Trimmer,   0.335f,  786.1f, 695.4f },
+    { "brain_y",      "Brain B",             ControlKind::Trimmer,   0.5f,  846.6f, 695.4f },
+    { "brain_z",      "Brain C",             ControlKind::Trimmer,   0.0f,  907.1f, 695.4f },
 
     { "power",        "Power",               ControlKind::Toggle,    1.0f,  181.4f, 1149.0f },
     { "default_patch","Default Patch Board", ControlKind::Toggle,    1.0f,    0.0f,    0.0f },

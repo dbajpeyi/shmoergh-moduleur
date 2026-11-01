@@ -7,8 +7,8 @@ The values are chosen to match the hardware's ranges and feel, not to be a SPICE
 
 ## Patching
 
-`src/dsp/Ports.h` lists every jack with its panel position (hole centres from
-`enclosure/fr4/01-front/graphics/front-edges.svg`) and the normalisations:
+`src/dsp/Ports.h` lists every jack with its panel position (the hole centres of the Moduleur front
+panel) and the normalisations:
 
 - **Default patch PCB** (`modules/08-default-patch`), traced from the pad nets of `default-patch.kicad_pcb`
   against each UI board's patch header: JP3/JP5/JP4/JP6 (oscillators → mixer), JP7 (mixer → filter LP),
@@ -80,5 +80,6 @@ hysteresis. Output scaled to 8 V (the recommended RV_OUT_GAIN setting). The VCA 
 and `sequencer-engine.cpp`. It keeps the same button timings (120 ms dual-press window, 400 ms short
 press, 1.5 s mode switch, 350 ms double tap), last-note priority with a 25-note stack, ±2 semitone bend,
 0–5 V CC outputs, and the sequencer's xorshift mutation, range/quantiser/transpose and swing maths.
-Plugin differences: MIDI comes from the host, omni until a channel is chosen, and in external-sync mode
-the DAW transport stands in for MIDI clock when nothing is patched into PULSE IN.
+The panel labels the firmware's buttons A/B as 1/2 and its knobs X/Y/Z as A/B/C. In the plugin, MIDI
+comes from the host and the Brain listens on all channels until one is chosen; in external-sync mode the
+DAW transport stands in for MIDI clock when nothing is patched into the PULSE input.

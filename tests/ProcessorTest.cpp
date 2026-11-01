@@ -88,6 +88,55 @@ int main()
         check (r > 0.02 && r < 0.7, "works at other sample rates and small blocks");
     }
 
+    // Hostile session data: non-finite parameters, duplicate/garbage cables,
+    // out-of-range Brain settings and UI values must be rejected or clamped.
+    {
+        juce::XmlElement root ("PARAMS");
+        for (const auto& def : moduleur::kParams)
+        {
+            auto* p = root.createNewChildElement ("PARAM");
+            p->setAttribute ("id", def.id);
+            p->setAttribute ("value", "nan");
+        }
+        auto* patchXml = root.createNewChildElement ("PATCH");
+        for (int i = 0; i < 5000; ++i)
+        {
+            auto* c = patchXml->createNewChildElement ("CABLE");
+            c->setAttribute ("from", i % 3 == 0 ? "vco1.out" : "no.such.port");
+            c->setAttribute ("to", i % 2 == 0 ? "vcf.lp" : "vco1.out");   // second form: output as destination
+            c->setAttribute ("colour", "zzzz");
+        }
+        auto* brainXml = root.createNewChildElement ("BRAIN");
+        brainXml->setAttribute ("mode", 99);
+        brainXml->setAttribute ("midiChannel", -7);
+        brainXml->setAttribute ("ccMode", 1234);
+        auto* uiXml = root.createNewChildElement ("UI");
+        uiXml->setAttribute ("stageScale", "nan");
+        uiXml->setAttribute ("cableOpacity", "1e30");
+
+        juce::MemoryBlock hostile;
+        juce::AudioProcessor::copyXmlToBinary (root, hostile);
+        std::unique_ptr<ModuleurProcessor> victim (dynamic_cast<ModuleurProcessor*> (createPluginFilter()));
+        victim->setStateInformation (hostile.getData(), (int) hostile.getSize());
+        check (victim->getCables().size() == 1, "hostile state: one cable per input, garbage dropped");
+
+        victim->setPlayConfigDetails (0, 2, 48000.0, 256);
+        victim->prepareToPlay (48000.0, 256);
+        juce::MidiBuffer m;
+        m.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        const double r = renderRms (*victim, 100, 256, &m);
+        check (r >= 0.0 && r < 1.0, "hostile state: output stays finite and bounded");
+
+        // Truncated / random bytes must be ignored.
+        juce::Random rng (1234);
+        juce::MemoryBlock junk (4096);
+        for (size_t i = 0; i < junk.getSize(); ++i)
+            static_cast<char*> (junk.getData())[i] = (char) rng.nextInt (256);
+        victim->setStateInformation (junk.getData(), (int) junk.getSize());
+        victim->setStateInformation (hostile.getData(), 7);
+        check (renderRms (*victim, 10, 256) >= 0.0, "random or truncated state is ignored");
+    }
+
     std::printf ("%s (%d failure%s)\n", failures == 0 ? "PASS" : "FAILED", failures, failures == 1 ? "" : "s");
     return failures == 0 ? 0 : 1;
 }

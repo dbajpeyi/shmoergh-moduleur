@@ -62,10 +62,10 @@ inline constexpr std::array<PortInfo, NumPorts> kPorts {{
     { "mix.in2",     "Mixer In 2",       false, 604.7f, 514.0f },
     { "mix.in3",     "Mixer In 3",       false, 665.2f, 514.0f },
 
-    { "vcf.hp",      "Filter HP In",     false, 786.1f, 423.3f },
-    { "vcf.cv1",     "Filter CV 1",      false, 846.6f, 423.3f },
-    { "vcf.cv2",     "Filter CV 2",      false, 907.1f, 423.3f },
-    { "vcf.lp",      "Filter LP In",     false, 786.1f, 514.0f },
+    { "vcf.hp",      "Filter HPF In",     false, 786.1f, 423.3f },
+    { "vcf.cv1",     "Filter Cutoff CV 1",      false, 846.6f, 423.3f },
+    { "vcf.cv2",     "Filter Cutoff CV 2",      false, 907.1f, 423.3f },
+    { "vcf.lp",      "Filter LPF In",     false, 786.1f, 514.0f },
     { "vcf.out",     "Filter Out",       true,  907.1f, 514.0f },
 
     { "env1.gate",   "Env 1 Gate",       false,  60.5f, 907.1f },
@@ -83,20 +83,20 @@ inline constexpr std::array<PortInfo, NumPorts> kPorts {{
     { "crush.trig",  "Crush Trigger",    false, 544.3f, 786.1f },
     { "crush.in",    "Crush In",         false, 544.3f, 907.1f },
     { "lfo.sqr",     "LFO Square",       true,  604.7f, 907.1f },
-    { "output.in",   "Output Main In",   false, 665.2f, 907.1f },
+    { "output.in",   "Output Audio In",   false, 665.2f, 907.1f },
     { "crush.out",   "Crush Out",        true,  544.3f, 997.8f },
     { "lfo.tri",     "LFO Triangle",     true,  604.7f, 997.8f },
     { "output.hp",   "Headphones",       true,  665.2f, 997.8f },
 
-    { "brain.in1",   "Brain In 1",       false, 786.1f, 907.1f },
-    { "brain.in2",   "Brain In 2",       false, 846.6f, 907.1f },
+    { "brain.in1",   "Brain CV In 1",       false, 786.1f, 907.1f },
+    { "brain.in2",   "Brain CV In 2",       false, 846.6f, 907.1f },
     { "brain.pin",   "Brain Pulse In",   false, 907.1f, 907.1f },
-    { "brain.out1",  "Brain Out 1",      true,  786.1f, 997.8f },
-    { "brain.out2",  "Brain Out 2",      true,  846.6f, 997.8f },
+    { "brain.out1",  "Brain CV Out 1",      true,  786.1f, 997.8f },
+    { "brain.out2",  "Brain CV Out 2",      true,  846.6f, 997.8f },
     { "brain.pulse", "Brain Pulse Out",  true,  907.1f, 997.8f },
 
-    { "ext.l",       "Host In L",        true,  302.4f, 1149.0f },
-    { "ext.r",       "Host In R",        true,  362.8f, 1149.0f },
+    { "ext.l",       "Host In L (sidechain)",        true,  302.4f, 1149.0f },
+    { "ext.r",       "Host In R (sidechain)",        true,  362.8f, 1149.0f },
 }};
 // clang-format on
 

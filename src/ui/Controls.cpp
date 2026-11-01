@@ -1,5 +1,6 @@
 #include "Controls.h"
 
+#include "DesignParts.h"
 #include "ModuleurAssets.h"
 
 namespace moduleur::ui
@@ -51,12 +52,69 @@ juce::ColourGradient nutGradient (const Theme& t, juce::Point<float> c, float r)
 }
 } // namespace
 
+namespace
+{
+// Paths of the design parts, in points around their centre.
+const juce::Path& trimmerCapPath()
+{
+    static const juce::Path p = []
+    {
+        auto path = juce::Drawable::parseSVGPath (design::kTrimmerCapPath);
+        path.applyTransform (juce::AffineTransform::translation (-design::kTrimmerCapCentreX, -design::kTrimmerCapCentreY));
+        return path;
+    }();
+    return p;
+}
+
+const juce::Path& cutoffPath()
+{
+    static const juce::Path p = []
+    {
+        auto path = juce::Drawable::parseSVGPath (design::kCutoffPath);
+        path.applyTransform (juce::AffineTransform::translation (-design::kCutoffCentreX, -design::kCutoffCentreY));
+        return path;
+    }();
+    return p;
+}
+
+// Maps design points around a part's centre onto the component (panel units).
+juce::AffineTransform designTransform (juce::Point<float> centre, float rotation = 0.0f)
+{
+    return juce::AffineTransform::rotation (rotation).scaled (kPtToPanel).translated (centre);
+}
+
+void fillDesignCircle (juce::Graphics& g, juce::Point<float> centre, float radiusPt, juce::Colour colour)
+{
+    const float r = radiusPt * kPtToPanel;
+    g.setColour (colour);
+    g.fillEllipse (centre.x - r, centre.y - r, r * 2.0f, r * 2.0f);
+}
+} // namespace
+
 const Theme& themeOf (const juce::Component& c)
 {
     static const Theme fallback = Theme::original();
     if (auto* lf = dynamic_cast<const ThemeLookAndFeel*> (&c.getLookAndFeel()))
         return lf->theme;
     return fallback;
+}
+
+//==============================================================================
+StageBackground::StageBackground()
+{
+    image = juce::ImageCache::getFromMemory (ModuleurAssets::stage3x_png, ModuleurAssets::stage3x_pngSize);
+    setInterceptsMouseClicks (false, false);
+    setBufferedToImage (true);   // re-rendered only when the editor is resized
+}
+
+void StageBackground::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colour (0xff090909));
+    if (image.isValid())
+    {
+        g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+        g.drawImage (image, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
+    }
 }
 
 //==============================================================================
@@ -202,6 +260,27 @@ void Knob::paint (juce::Graphics& g)
     const float pos = (float) valueToProportionOfLength (getValue());
     const float angle = positionToAngle (pos);
 
+    if (t.design)
+    {
+        if (kind == ControlKind::BigKnob)
+        {
+            // Cutoff: Ø58 pt cap with its pointer tab, rotating as one piece.
+            g.setColour (design::kCap);
+            g.fillPath (cutoffPath(), designTransform (c, angle));
+            return;
+        }
+        // Trimmer: black Ø40 pt seat, scalloped Ø32 pt cap, 4 x 9 pt pointer bar.
+        const bool orange = paramIndex == P_MIX_MAIN || paramIndex == P_VOLUME;
+        fillDesignCircle (g, c, 20.0f, design::kRing);
+        g.setColour (orange ? design::kOrange : design::kCap);
+        g.fillPath (trimmerCapPath(), designTransform (c, angle));
+        juce::Path bar;
+        bar.addRoundedRectangle (-2.0f, -12.66f, 4.0f, 9.0f, 2.0f);
+        g.setColour (orange ? design::kCap : design::kPointer);
+        g.fillPath (bar, designTransform (c, angle));
+        return;
+    }
+
     // Output level knobs (MIXER OUT, VOLUME) are orange on the built Moduleur.
     const bool accent = paramIndex == P_MIX_MAIN || paramIndex == P_VOLUME;
     const auto cap = accent ? t.accentKnob : t.knob;
@@ -278,6 +357,15 @@ void Fader::paint (juce::Graphics& g)
     const auto& t = themeOf (*this);
     const auto b = getLocalBounds().toFloat();
     const float pos = (float) valueToProportionOfLength (getValue());
+
+    if (t.design)
+    {
+        // The slot is part of the panel art; the cap is a white Ø20 pt disc
+        // travelling between the slot's rounded ends.
+        const float yTop = b.getCentreY() - travel * 0.5f;
+        fillDesignCircle (g, { b.getCentreX(), yTop + (1.0f - pos) * travel }, 10.0f, design::kCap);
+        return;
+    }
     const float capH = 40.0f, capW = 26.0f;
     const float yTop = b.getCentreY() - travel * 0.5f;
     const float cy = yTop + (1.0f - pos) * travel;
@@ -375,6 +463,20 @@ void WaveSelector::paint (juce::Graphics& g)
     const auto& t = themeOf (*this);
     const float size = Knob::kBigSize;
     const auto c = knobCentre();
+
+    if (t.design)
+    {
+        // White Ø88 pt disc, 18 x 8 pt pointer tab, Ø24 pt hub hole.
+        const float a = kAngles[getIndex()];
+        juce::Path body;
+        body.addEllipse (-44.0f, -44.0f, 88.0f, 88.0f);
+        body.addRectangle (38.0f, -4.0f, 18.0f, 8.0f);
+        g.setColour (design::kCap);
+        g.fillPath (body, designTransform (c, a));
+        fillDesignCircle (g, c, 12.0f, design::kPanel);
+        return;
+    }
+
     const float angle = kAngles[getIndex()] + juce::MathConstants<float>::halfPi; // juce: 0 = up
     const float r = size * 0.5f - 6.0f;
 
@@ -431,6 +533,14 @@ void PushButton::paint (juce::Graphics& g)
     const auto& t = themeOf (*this);
     const auto c = getLocalBounds().toFloat().getCentre();
     const bool down = state.load();
+
+    if (t.design)
+    {
+        // Black Ø44 pt bezel, grey Ø36 pt cap.
+        fillDesignCircle (g, c, 22.0f, design::kRing);
+        fillDesignCircle (g, c, 18.0f, down ? design::kButtonDown : design::kButton);
+        return;
+    }
     const float r = 18.5f;
 
     // Bezel
@@ -477,6 +587,14 @@ void PowerButton::paint (juce::Graphics& g)
 {
     const auto& t = themeOf (*this);
     const auto c = getLocalBounds().toFloat().getCentre();
+
+    if (t.design)
+    {
+        // Black Ø40 pt bezel, grey Ø30 pt cap (darker when off).
+        fillDesignCircle (g, c, 20.0f, design::kRing);
+        fillDesignCircle (g, c, 15.0f, on ? design::kPowerOn : design::kPowerOff);
+        return;
+    }
     const float r = 20.5f;
     drawShadow (g, c, r, 3.0f, 0.4f);
     juce::Path nut;
@@ -504,6 +622,15 @@ void LedLight::setLevel (float v)
 void LedLight::paint (juce::Graphics& g)
 {
     const auto c = getLocalBounds().toFloat().getCentre();
+
+    if (themeOf (*this).design)
+    {
+        // Black Ø16 pt seat, Ø12 pt lens from dark red to red.
+        fillDesignCircle (g, c, 8.0f, design::kRing);
+        fillDesignCircle (g, c, 6.0f, design::kLedOff.interpolatedWith (design::kLedOn, level));
+        return;
+    }
+
     const float r = 6.0f;
     if (level > 0.01f)
     {
@@ -539,6 +666,18 @@ void Jack::paint (juce::Graphics& g)
     const auto& t = themeOf (*this);
     const auto c = getLocalBounds().toFloat().getCentre();
     const float r = 13.5f;
+
+    if (t.design)
+    {
+        // The jack itself is part of the panel art; only patching feedback is drawn.
+        if (highlighted || (hover && patchable))
+        {
+            const float rr = 22.5f * kPtToPanel;
+            g.setColour ((highlighted ? juce::Colours::white : juce::Colours::white.withAlpha (0.45f)));
+            g.drawEllipse (c.x - rr, c.y - rr, rr * 2.0f, rr * 2.0f, 1.6f);
+        }
+        return;
+    }
     drawShadow (g, c, r, 2.0f, t.dark ? 0.6f : 0.35f);
 
     // Knurled nut

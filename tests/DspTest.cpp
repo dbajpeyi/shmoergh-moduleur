@@ -199,7 +199,7 @@ int main()
         check (rms (damped, 48000) < 0.05, "filter is stable below the oscillation point");
     }
 
-    // 4. Brain sequencer: hold A+B to switch modes, press A to play.
+    // 4. Brain sequencer: hold buttons 1+2 to switch modes, press 1 to play.
     {
         Harness h;
         auto press = [&h] (bool a, bool b, double seconds)
@@ -216,7 +216,7 @@ int main()
         };
         press (true, true, 1.7);
         press (false, false, 0.1);
-        check (h.rack.brain.getSettings().mode == Brain::Mode::Sequencer, "A+B long press switches to the sequencer");
+        check (h.rack.brain.getSettings().mode == Brain::Mode::Sequencer, "holding 1+2 switches to the sequencer");
         press (true, false, 0.05);
         press (false, false, 0.05);
         int gates = 0;

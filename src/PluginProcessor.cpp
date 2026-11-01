@@ -5,9 +5,9 @@ using namespace moduleur;
 
 namespace
 {
+// Cable colours of the panel design: yellow, orange, blue, green, red.
 const juce::Colour kCableColours[] = {
-    juce::Colour (0xffe8452c), juce::Colour (0xfff2b705), juce::Colour (0xff2e6fd8), juce::Colour (0xff262626),
-    juce::Colour (0xff19a974), juce::Colour (0xfff07f2e), juce::Colour (0xff8e5cd9), juce::Colour (0xffe85a9b),
+    juce::Colour (0xffffc900), juce::Colour (0xffff8700), juce::Colour (0xff0074ef), juce::Colour (0xff00af6f), juce::Colour (0xffff4100),
 };
 
 int portFromId (const juce::String& id)
@@ -79,7 +79,8 @@ void ModuleurProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     setLatencySamples (juce::roundToInt (oversampling->getLatencyInSamples()));
 
     scratch.setSize (2, samplesPerBlock);
-    rack.prepare (sampleRate * 2.0);
+    rackSampleRate = sampleRate * 2.0;
+    rack.prepare (rackSampleRate);
     brainSettingsPending = true;
 }
 
@@ -89,13 +90,22 @@ void ModuleurProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     const int numSamples = buffer.getNumSamples();
     if (numSamples == 0 || oversampling == nullptr)
         return;
+    if (needsRackReset)
+    {
+        rack.prepare (rackSampleRate);
+        needsRackReset = false;
+    }
     if (scratch.getNumSamples() < numSamples)
         scratch.setSize (2, numSamples, false, false, true);
 
     // --- controls ---
     float values[NumParams];
     for (int i = 0; i < NumParams; ++i)
-        values[i] = paramPtrs[(size_t) i]->load (std::memory_order_relaxed);
+    {
+        // Saved sessions are untrusted input: never let a non-finite value reach the DSP.
+        const float v = paramPtrs[(size_t) i]->load (std::memory_order_relaxed);
+        values[i] = std::isfinite (v) ? v : kParams[(size_t) i].defaultValue;
+    }
     auto params = makeRackParams (values);
     params.buttonA = buttonA.load();
     params.buttonB = buttonB.load();
@@ -134,7 +144,7 @@ void ModuleurProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     }
     rack.brain.setTransport (playing, ppq, bpm, hasPos);
 
-    // --- host audio into the EXT jacks ---
+    // --- host audio into the HOST L / HOST R jacks ---
     const int numIn = getTotalNumInputChannels();
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -176,7 +186,13 @@ void ModuleurProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         for (int k = 0; k < 2; ++k)
         {
             const size_t idx = (size_t) (2 * n + k);
-            const float y = rack.processSample (upL[idx], upR[idx]) * Rack::kVoltsToDigital;
+            float y = rack.processSample (upL[idx], upR[idx]) * Rack::kVoltsToDigital;
+            if (! std::isfinite (y))
+            {
+                // Last-resort safety: output silence and rebuild the rack next block.
+                y = 0.0f;
+                needsRackReset = true;
+            }
             upL[idx] = y;
             upR[idx] = y;
         }
@@ -304,23 +320,29 @@ void ModuleurProcessor::setStateInformation (const void* data, int sizeInBytes)
 
     if (patchTree.isValid())
     {
+        // At most one cable per input jack; anything malformed is skipped.
         const juce::ScopedLock sl (cablesLock);
         cables.clear();
+        std::array<bool, NumPorts> inputUsed {};
         for (auto cable : patchTree)
         {
+            if (! cable.hasType ("CABLE"))
+                continue;
             const int from = portFromId (cable["from"].toString());
             const int to = portFromId (cable["to"].toString());
-            if (from >= 0 && to >= 0 && isOutput (from) && ! isOutput (to))
-                cables.push_back ({ from, to, juce::Colour::fromString (cable["colour"].toString()) });
+            if (from < 0 || to < 0 || ! isOutput (from) || isOutput (to) || inputUsed[(size_t) to])
+                continue;
+            inputUsed[(size_t) to] = true;
+            cables.push_back ({ from, to, juce::Colour::fromString (cable["colour"].toString()).withAlpha (1.0f) });
         }
         colourIndex = (int) cables.size();
         publishCables();
     }
     if (brainTree.isValid())
     {
-        brainMode = (int) brainTree["mode"];
-        brainChannel = (int) brainTree["midiChannel"];
-        brainCcMode = (int) brainTree["ccMode"];
+        brainMode = juce::jlimit (0, 1, (int) brainTree["mode"]);
+        brainChannel = juce::jlimit (0, 16, (int) brainTree["midiChannel"]);
+        brainCcMode = juce::jlimit (0, 3, (int) brainTree["ccMode"]);
         brainPitchOnOut1 = (bool) brainTree["pitchOnOut1"];
         brainSettingsPending = true;
     }

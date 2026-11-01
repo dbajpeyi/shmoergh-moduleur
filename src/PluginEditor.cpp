@@ -5,7 +5,7 @@ using namespace moduleur::ui;
 
 namespace
 {
-constexpr float kDefaultScale = 0.68f;
+constexpr float kDefaultScale = 0.62f;   // of the stage (1081 x 1443 units)
 
 juce::Rectangle<int> boxAt (float x, float y, float w, float h)
 {
@@ -20,22 +20,30 @@ const char* kHelp =
     "filter, the filter feeds VCA 1 and the output. LFO TRI goes to filter CV/1 and ENV 2 to CV/2 "
     "(turn the LEVEL attenuverters to hear them). Plugging into a jack breaks its default connection.\n\n"
     "BRAIN (Le Controlleur firmware)\n"
-    "MIDI from your DAW arrives at the Brain. MIDI to CV: OUT/1 pitch, OUT/2 velocity, PULSE gate.\n"
-    "Hold A + turn X: MIDI channel. Hold B + turn Y: pitch on OUT/1 or OUT/2; B + Z: velocity, "
-    "mod wheel, unison or duophonic. Tap A+B: panic.\n"
-    "Hold A+B for 1.5 s to switch to the Sequencer: A play/pause, X tempo (fully left = sync to "
-    "PULSE IN or the DAW transport), Y range, Z randomness. Hold B for swing / scale / length; "
-    "double-tap and hold B to transpose.\n\n"
-    "Double-click a knob to reset it. Right-click the panel for themes, size and patch options.";
+    "MIDI from your DAW arrives at the Brain. MIDI to CV: first CV out = pitch, second = velocity, "
+    "PULSE = gate.\n"
+    "Hold 1 + turn A: MIDI channel. Hold 2 + turn B: pitch on the first or second CV out; 2 + C: "
+    "velocity, mod wheel, unison or duophonic. Tap 1+2: panic.\n"
+    "Hold 1+2 for 1.5 s to switch to the Sequencer: 1 play/pause, A tempo (fully left = sync to "
+    "PULSE in or the DAW transport), B range, C randomness. Hold 2 for swing / scale / length; "
+    "double-tap and hold 2 to transpose.\n\n"
+    "HOST L / HOST R carry the plugin's (sidechain) audio input.\n\n"
+    "Double-click a knob to reset it. Right-click the panel for size and patch options.";
 } // namespace
 
 ModuleurEditor::ModuleurEditor (ModuleurProcessor& p)
     : AudioProcessorEditor (p), processor (p), cables (p)
 {
     setLookAndFeel (&lookAndFeel);
-    content.setSize ((int) kPanelWidth, (int) kPanelHeight);
+    stage.setSize (juce::roundToInt (kStageWidth), juce::roundToInt (kStageHeight));
+    stage.onPopup = [this] (const juce::MouseEvent&) { showMenu(); };
+    addAndMakeVisible (stage);
+    stageBackground.setBounds (stage.getLocalBounds());
+    stage.addAndMakeVisible (stageBackground);
+
+    content.setBounds (juce::roundToInt (kPanelOriginX), juce::roundToInt (kPanelOriginY), (int) kPanelWidth, (int) kPanelHeight);
     content.onPopup = [this] (const juce::MouseEvent&) { showMenu(); };
-    addAndMakeVisible (content);
+    stage.addAndMakeVisible (content);
 
     background.setBounds (content.getLocalBounds());
     content.addAndMakeVisible (background);
@@ -63,7 +71,8 @@ ModuleurEditor::ModuleurEditor (ModuleurProcessor& p)
             case ControlKind::Slider:
             {
                 const bool longSlot = i == P_ENV1_SUSTAIN || i == P_ENV2_SUSTAIN;
-                const float travel = longSlot ? 186.0f : 110.0f;
+                // Cap travel between the slot's rounded ends: 112 pt (mixer) / 172 pt (sustain).
+                const float travel = (longSlot ? 172.0f : 112.0f) * kPtToPanel;
                 auto fader = std::make_unique<Fader> (i, travel);
                 fader->setBounds (boxAt (def.x, def.y, 34, travel + 46));
                 fader->setDoubleClickReturnValue (true, def.defaultValue);
@@ -149,12 +158,14 @@ ModuleurEditor::ModuleurEditor (ModuleurProcessor& p)
     applyTheme();
 
     // Read the saved size first: setting the limits triggers resized().
-    const float scale = juce::jlimit (0.42f, 1.5f, (float) processor.uiState.getProperty ("scale", kDefaultScale));
+    float scale = (float) processor.uiState.getProperty ("stageScale", kDefaultScale);
+    scale = std::isfinite (scale) ? juce::jlimit (0.4f, 1.5f, scale) : kDefaultScale;
     setResizable (true, true);
     if (auto* c = getConstrainer())
-        c->setFixedAspectRatio (kPanelWidth / kPanelHeight);
-    setResizeLimits (400, 500, 1452, 1815);
-    setSize (juce::roundToInt (kPanelWidth * scale), juce::roundToInt (kPanelHeight * scale));
+        c->setFixedAspectRatio (kStageWidth / kStageHeight);
+    setResizeLimits (juce::roundToInt (kStageWidth * 0.4f), juce::roundToInt (kStageHeight * 0.4f),
+                     juce::roundToInt (kStageWidth * 1.5f), juce::roundToInt (kStageHeight * 1.5f));
+    setSize (juce::roundToInt (kStageWidth * scale), juce::roundToInt (kStageHeight * scale));
 
     startTimerHz (30);
 }
@@ -168,28 +179,34 @@ ModuleurEditor::~ModuleurEditor()
 
 void ModuleurEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff111111));
+    g.fillAll (juce::Colour (0xff090909));
 }
 
 void ModuleurEditor::resized()
 {
-    const float scale = (float) getWidth() / kPanelWidth;
-    content.setTransform (juce::AffineTransform::scale (scale));
-    processor.uiState.setProperty ("scale", scale, nullptr);
+    const float scale = (float) getWidth() / kStageWidth;
+    stage.setTransform (juce::AffineTransform::scale (scale));
+    processor.uiState.setProperty ("stageScale", scale, nullptr);
 }
 
 void ModuleurEditor::setScale (float s)
 {
-    setSize (juce::roundToInt (kPanelWidth * s), juce::roundToInt (kPanelHeight * s));
+    setSize (juce::roundToInt (kStageWidth * s), juce::roundToInt (kStageHeight * s));
 }
 
 void ModuleurEditor::applyTheme()
 {
-    const auto id = processor.uiState.getProperty ("theme", "original").toString();
-    lookAndFeel.theme = id == "white" ? Theme::white() : (id == "black" ? Theme::black() : Theme::original());
+    // Only the Figma design is offered unless the legacy looks are compiled in.
+    const auto id = processor.uiState.getProperty ("theme", "figma").toString();
+    if (! kPanelThemesEnabled || id == "figma")
+        lookAndFeel.theme = Theme::figma();
+    else
+        lookAndFeel.theme = id == "white" ? Theme::white() : (id == "black" ? Theme::black() : Theme::original());
     background.setTheme (lookAndFeel.theme);
-    content.repaint();
-    cables.setOpacity ((float) processor.uiState.getProperty ("cableOpacity", 0.9f));
+    background.setVisible (! lookAndFeel.theme.design);
+    stage.repaint();
+    const float opacity = (float) processor.uiState.getProperty ("cableOpacity", 0.9f);
+    cables.setOpacity (std::isfinite (opacity) ? juce::jlimit (0.2f, 1.0f, opacity) : 0.9f);
 }
 
 void ModuleurEditor::timerCallback()
@@ -332,7 +349,7 @@ void ModuleurEditor::jackReleased (Jack&, const juce::MouseEvent& e)
 void ModuleurEditor::showMenu()
 {
     juce::PopupMenu menu;
-    const auto themeId = processor.uiState.getProperty ("theme", "original").toString();
+    const auto themeId = processor.uiState.getProperty ("theme", "figma").toString();
     auto* defaultPatch = processor.apvts.getParameter ("default_patch");
     const bool boardFitted = defaultPatch->getValue() > 0.5f;
     const int brainMode = processor.brainModeForUi.load();
@@ -342,13 +359,17 @@ void ModuleurEditor::showMenu()
     {
         theme.addItem (name, true, themeId == id, [this, id] { processor.uiState.setProperty ("theme", id, nullptr); applyTheme(); });
     };
-    addTheme ("Moduleur (black aluminium, white knobs)", "original");
-    addTheme ("White FR4 (DIY panel)", "white");
-    addTheme ("Black FR4 (DIY panel)", "black");
-    menu.addSubMenu ("Panel", theme);
+    if (kPanelThemesEnabled)
+    {
+        addTheme ("Moduleur design", "figma");
+        addTheme ("Shaded hardware", "original");
+        addTheme ("White FR4 (DIY panel)", "white");
+        addTheme ("Black FR4 (DIY panel)", "black");
+        menu.addSubMenu ("Panel", theme);
+    }
 
     juce::PopupMenu size;
-    for (float s : { 0.5f, 0.6f, 0.68f, 0.8f, 1.0f, 1.25f })
+    for (float s : { 0.45f, 0.55f, 0.62f, 0.75f, 0.9f, 1.1f })
         size.addItem (juce::String (juce::roundToInt (s * 100.0f)) + "%", [this, s] { setScale (s); });
     menu.addSubMenu ("Size", size);
 

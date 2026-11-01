@@ -1,6 +1,17 @@
+Shmøergh Moduleur © 2026 Shmøergh
+
+The Moduleur plugin follows the licensing of the Moduleur hardware:
+
+  - Panel design and artwork (assets/): Creative Commons
+    Attribution-NonCommercial 4.0 International (CC BY-NC 4.0),
+    https://creativecommons.org/licenses/by-nc/4.0/
+
+  - Software (everything else in this repository): MIT licence, below.
+
+-------------------------------------------------------------------------------
 MIT License
 
-Copyright (c) 2026 shmoergh-clone contributors
+Copyright (c) 2026 Shmøergh
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,14 +32,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 -------------------------------------------------------------------------------
-Third-party material
+Third-party software
 
-assets/panel/*.svg — front panel artwork from the Shmøergh Moduleur
-(https://github.com/shmoergh/moduleur, enclosure/fr4/01-front/graphics,
-commit 555bf5e). © Shmøergh, licensed CC BY-NC 4.0
-(https://creativecommons.org/licenses/by-nc/4.0/). Modified: artboard clip
-path removed. Not for commercial use.
+JUCE (https://juce.com), downloaded at build time, is dual-licensed under the
+GNU AGPLv3 and the JUCE licence. Plugin binaries built from this repository
+include JUCE and are distributed under the terms of one of those licences.
 
-src/dsp/Brain.cpp — behaviour ported from Le Controlleur and the Brain SDK
-(https://github.com/shmoergh/le-controlleur, https://github.com/shmoergh/brain-sdk),
-© Shmøergh, MIT licence.
+The Brain module's behaviour follows Shmøergh's Le Controlleur firmware and
+Brain SDK (https://github.com/shmoergh/le-controlleur), MIT licensed.

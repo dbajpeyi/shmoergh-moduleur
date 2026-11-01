@@ -68,8 +68,12 @@ void Brain::reset()
         seqEnter();
 }
 
-void Brain::setSettings (const Settings& s)
+void Brain::setSettings (const Settings& requested)
 {
+    Settings s = requested;
+    s.mode = s.mode == Mode::Sequencer ? Mode::Sequencer : Mode::MidiToCv;
+    s.midiChannel = std::clamp (s.midiChannel, 0, 16);
+    s.ccMode = (CcMode) std::clamp ((int) s.ccMode, 0, 3);
     const bool modeChanged = s.mode != settings.mode;
     settings = s;
     if (modeChanged && settings.mode == Mode::Sequencer)

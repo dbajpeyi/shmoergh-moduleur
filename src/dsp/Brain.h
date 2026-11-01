@@ -5,7 +5,8 @@
 
 // The Brain module runs firmware on a Raspberry Pi Pico. This is a port of the
 // behaviour of "Le Controlleur" (shmoergh/le-controlleur, MIT licence): a MIDI to
-// CV converter and a probabilistic 16th-note sequencer, switched by holding A+B.
+// CV converter and a probabilistic 16th-note sequencer, switched by holding
+// buttons 1+2 (the firmware calls the buttons A/B and the knobs X/Y/Z).
 // MIDI comes from the plugin host instead of the TRS MIDI jack, and the host
 // transport stands in for MIDI clock in external-sync mode.
 namespace moduleur

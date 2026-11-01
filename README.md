@@ -1,115 +1,99 @@
-# Moduleur (plugin)
+# Shmøergh Moduleur plugin
 
-A software version of the [Shmøergh Moduleur](https://github.com/shmoergh/moduleur), the open-source
-analog modular synthesizer, as an **Audio Unit, VST3 and standalone app** for macOS (VST3/standalone also
-build on Linux).
+The official software version of the [Shmøergh Moduleur](https://github.com/shmoergh/moduleur), the open-source analog modular synthesizer. Play it as an Audio Unit or VST3 instrument in your DAW, or on its own as a standalone app.
 
-![Moduleur plugin](docs/screenshot.png)
+![The Moduleur plugin](docs/screenshot.png)
 
-The front panel is drawn from the Moduleur's own FR4 enclosure artwork
-(`enclosure/fr4/01-front/graphics`), so every knob, slider, jack and LED sits where it does on the hardware.
-The sound comes from behavioural models of each module's schematic:
+The plugin has the same eight modules and the same front panel as the hardware. Every module is modelled from its published schematic, so it responds the way the circuits do: a 1 V/oct saw-core oscillator, a three-pole diode ladder filter that can scream into self-oscillation, RC envelopes, a JFET sample-and-hold "bitcrusher" and an LED-clipping output stage. It comes pre-patched like a Moduleur fitted with its default patch board. Play a note and it makes sound. Add patch cables to take it further.
 
-| Module | What's modelled |
+## Modules
+
+| Module | What it does |
 | --- | --- |
-| **Oscillator ×2** | Saw core with 1 V/oct expo pitch (OCTAVE 0–5.2 V, FINE ±1 oct), diode triangle shaper, comparator square with WIDTH + PWM, CD4040 ÷2 **SUB** (OSC 1) and transistor **NOISE** (OSC 2), hard sync, linear FM, TRI/SAW/SQR rotary switch. Band-limited (PolyBLEP). |
-| **Mixer & Sidechain** | 3 DC-coupled channels on sliders into a VCA, channel 4 with GAIN (×1–11), peak detector, THRESHOLD subtractor, so IN/4 can "pump" the mix. Main OUT level. |
-| **Filter** | 3-pole diode ladder (the D1–D10 / 3×1 nF network) with separate **IN/LP** and **IN/HP** inputs, resonance up to self-oscillation, two CV inputs with log attenuverters. |
-| **Envelope & VCA ×2** | RC ADSR (10 µF cap, log timing pots up to ~10 s), 0–8 V out, LED; diff-pair VCA. ENV OUT is jumpered to the VCA CONTROL like the hardware jumper. |
-| **Crush / LFO / Output** | JFET sample & hold "bitcrusher" with its 160 Hz–19 kHz relaxation clock (or external TRIGGER), triangle/square LFO 0.1–200 Hz with LFO AMNT, output stage with DRIVE into red-LED clipping, VOLUME. |
-| **Brain** | A port of the [Le Controlleur](https://github.com/shmoergh/le-controlleur) firmware (MIDI to CV and the generative Sequencer), using the same X/Y/Z pots, A/B buttons and LEDs. MIDI comes from your DAW. |
+| **Oscillator** (×2) | Triangle, saw and square from a saw core, with octave and fine tuning, pulse width, hard sync and linear FM. Oscillator 1 also has a sub-octave out, oscillator 2 a noise out. |
+| **Mixer & Sidechain** | Three DC-coupled inputs on sliders plus a fourth input with its own gain. Anything patched into IN 4 can duck the mix like a sidechain compressor. |
+| **Filter** | A three-pole diode ladder with separate low-pass and high-pass inputs, resonance up to self-oscillation and two cutoff CV inputs with attenuverters. |
+| **Envelope & VCA** (×2) | An ADSR with times from about a millisecond to ten seconds, and a VCA. Each envelope already controls its own VCA. |
+| **Crush / LFO / Output** | A sample-and-hold bitcrusher (or sample and hold, with an external trigger), a triangle/square LFO from 0.1 to 200 Hz, and the output with LED drive. |
+| **Brain** | Runs Le Controlleur, the Brain's firmware: MIDI to CV, or a generative step sequencer. |
 
-Everything runs at 2× oversampling, in volts like the real thing.
+## Installing (macOS)
 
-## Playing it
+1. Download the zip files from the [latest release](../../releases/latest). They run natively on Apple Silicon and Intel Macs with macOS 10.13 or later.
+2. Unzip them and copy the files:
+   - `Moduleur.component` (Audio Unit: Logic Pro, GarageBand, MainStage) → `~/Library/Audio/Plug-Ins/Components/`
+   - `Moduleur.vst3` (Ableton Live, Bitwig, Reaper, Cubase…) → `~/Library/Audio/Plug-Ins/VST3/`
+   - `Moduleur.app` (standalone) → `/Applications`
+3. Current releases aren't notarized by Apple yet, so macOS blocks them the first time. Open Terminal and run:
 
-Load it as an instrument and play MIDI. It ships with the **default patch board** fitted (the Moduleur's
-optional passive PCB), so it plays without cables:
+   ```sh
+   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Moduleur.component \
+       ~/Library/Audio/Plug-Ins/VST3/Moduleur.vst3 /Applications/Moduleur.app
+   ```
 
-```
-OSC 1 OUT, OSC 2 OUT, OSC 1 SUB, OSC 2 NOISE -> Mixer IN/1..4 -> Filter IN/LP -> VCA 1 -> Output
-LFO TRI -> Filter CV/1        ENV 2 -> Filter CV/2     (turn the LEVEL attenuverters to hear them)
-PITCH and GATE jacks are mirrored between OSC 1/2 and ENV 1/2
-```
+4. Restart your DAW. If Logic Pro doesn't list Moduleur, run `auval -v aumu Mdlr Shmo` in Terminal once.
 
-Two cables are patched on a fresh instance: **Brain OUT/1 → OSC 1 PITCH** and **Brain PULSE → ENV 1 GATE**.
-The patch board mirrors them to OSC 2 and ENV 2. Brain OUT/2 carries velocity (0–5 V) by default.
+## Playing
 
-**Patching:** drag from any jack to another. Drag a cable out of an input to move it, or drop it on the panel
-to unplug it. Right-click a jack to remove its cables. As on the hardware, plugging into a jack breaks its
-default-patch connection (e.g. patching OSC 2 OUT elsewhere removes it from the mixer).
+Load **Moduleur** as an instrument and play. In the standalone app, choose your audio output and MIDI keyboard under **Options → Audio/MIDI Settings**.
 
-**Brain (Le Controlleur):**
-- *MIDI to CV* (default): hold **A** and turn **X** to pick the MIDI channel (omni until you set one). Hold **B**
-  and turn **Y** to choose OUT/1 or OUT/2 for pitch, and **Z** for velocity / mod wheel / unison / duophonic.
-  Tap **A+B** for panic.
-- Hold **A+B for 1.5 s** to switch to the *Sequencer*: **A** play/pause, **X** tempo (fully left = external sync
-  to PULSE IN or the DAW transport), **Y** octave range, **Z** randomness. Hold **B** for swing / scale /
-  length; double-tap and hold **B** to transpose.
+Out of the box the default patch board is fitted:
 
-Double-click a control to reset it. Right-click the panel for the menu: white or black FR4 panel, size, cable
-opacity, Brain firmware, removing the default patch board, init patch and panic. Every control is a host
-parameter, so you can automate it.
+- Both oscillators, the sub and the noise feed the mixer.
+- The mixer feeds the filter, the filter feeds the first VCA, and the VCA feeds the output.
+- The LFO triangle goes to the filter's first CUTOFF input, and envelope 2 to the second. Turn the two LEVEL knobs to hear them.
+- The PITCH and GATE jacks of the two voices are linked, so one pitch cable and one gate cable play everything.
 
-**Plugin-only additions:** two **HOST IN** jacks in the bottom strip carry the plugin's (sidechain) audio input,
-so you can patch a drum loop into Mixer IN/4 to pump the mix, or run audio through the filter. The **ON/OFF**
-switch mutes the output.
+A fresh instance also comes with two cables: Brain CV out to oscillator 1 PITCH, and Brain PULSE to envelope 1 GATE.
 
-## Installing on macOS
+**Patching.** Drag from one jack to another to add a cable. Drag a cable's end out of a jack to move it, or drop it on the panel to unplug it. Right-click a jack to remove its cables. Plugging into a jack breaks its default connection, just like on the hardware.
 
-### Download
+**Knobs and sliders.** Drag up and down. Double-click to reset. Every control can be automated from your DAW.
 
-Get the zips from the [**Releases**](../../releases/latest) page (universal: Apple Silicon + Intel).
-Builds of every push are also on the **Actions → Build** run pages, as the **Moduleur-macOS** artifact.
+**The menu.** Right-click the panel to resize the window, change cable opacity, switch the Brain's firmware, remove the default patch board, reset to the starting patch, or send a panic.
 
-To publish a new release, bump `VERSION` in `CMakeLists.txt`, then either push a matching tag
-(`git tag v0.2.0 && git push origin v0.2.0`) or open **Actions → Build → Run workflow** on `main` and enter
-the version (e.g. `v0.2.0`). CI builds, tests, validates the AU, creates the tag and attaches the zips.
+## The Brain
 
-- `Moduleur.component` → `~/Library/Audio/Plug-Ins/Components/`
-- `Moduleur.vst3` → `~/Library/Audio/Plug-Ins/VST3/`
-- `Moduleur.app` → `/Applications` (the standalone; pick your MIDI keyboard and audio device under *Options*)
+MIDI from your DAW goes to the Brain, which runs Le Controlleur in one of two modes.
 
-The builds are ad-hoc signed, not notarised. After downloading, clear the quarantine flag:
+**MIDI to CV** (the default). The first CV out carries pitch, the second carries velocity, and PULSE carries the gate.
+
+- Hold **1** and turn **A** to pick a MIDI channel. Until you pick one, it listens on all channels.
+- Hold **2** and turn **B** to choose which CV out carries pitch.
+- Hold **2** and turn **C** to make the second CV out carry velocity, mod wheel, the same pitch (unison) or a second note (duophonic).
+- Tap **1** and **2** together to silence stuck notes.
+
+**Sequencer.** Hold **1** and **2** together for 1.5 seconds to switch modes.
+
+- **1** starts and stops it.
+- **A** sets the tempo. Turned fully left, it follows the PULSE input, or your DAW's transport if nothing is patched there.
+- **B** sets the note range. **C** adds randomness: fully left, the sequence stays locked; turned up, notes and rhythms keep changing.
+- Hold **2** for the second layer: swing on A, scale on B, sequence length on C.
+- Double-tap and hold **2** to transpose with B (octave) and C (key).
+
+## Plugin extras
+
+- **HOST L / HOST R** carry your DAW's sidechain input, or the audio input in the standalone app. Patch a drum loop into the mixer's IN 4 to make the mix pump, or run any audio through the filter.
+- **ON/OFF** mutes the output.
+
+## Building from source
+
+You need Xcode (or the Command Line Tools) and CMake 3.22 or later. JUCE is downloaded automatically.
 
 ```sh
-xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Moduleur.component \
-    ~/Library/Audio/Plug-Ins/VST3/Moduleur.vst3 /Applications/Moduleur.app
-```
-
-If Logic doesn't list it, run `auval -v aumu Mdlr Shmc` once, or restart Logic.
-
-### Build it yourself
-
-Requires Xcode (or the Command Line Tools) and CMake ≥ 3.22. JUCE 8 is fetched automatically.
-
-```sh
-cmake -S . -B build -G Xcode          # or: -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -G Xcode
 cmake --build build --config Release
-ctest --test-dir build -C Release     # DSP + processor tests
+ctest --test-dir build -C Release
 ```
 
-On macOS the AU and VST3 are copied into `~/Library/Audio/Plug-Ins/` after building (turn this off with
-`-DMODULEUR_COPY_AFTER_BUILD=OFF`). The standalone app is in
-`build/ShmoerghModuleur_artefacts/Release/Standalone/`.
+On macOS the Audio Unit and VST3 are copied into `~/Library/Audio/Plug-Ins` after building. To turn that off, add `-DMODULEUR_COPY_AFTER_BUILD=OFF`. The VST3 and the standalone app also build on Linux.
 
-## Project layout
+How each module is modelled is described in [docs/DSP.md](docs/DSP.md). Maintainers will find the release process in [docs/RELEASING.md](docs/RELEASING.md).
 
-```
-src/dsp/      Module models (Modules.h), Brain firmware port, rack/patching engine, port + normal tables
-src/ui/       Panel artwork, knobs, faders, jacks, LEDs, patch cables
-src/          Plugin processor/editor, parameter table (Params.h)
-assets/panel  Front-panel copper and silkscreen artwork from the Moduleur repository
-tests/        Headless DSP and processor tests
-docs/DSP.md   Notes on how each circuit is modelled
-```
+## Licence
 
-## Credits and licence
+Shmøergh Moduleur © 2026 Shmøergh
 
-This is an unofficial fan project, not affiliated with or endorsed by Shmøergh.
+The panel design and artwork are licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), like the Moduleur hardware.
 
-- The Moduleur hardware design and the panel artwork in `assets/panel` are © Shmøergh, licensed
-  [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). That makes this plugin **non-commercial**.
-- The Brain behaviour is ported from Shmøergh's Le Controlleur / Brain SDK (MIT).
-- The plugin code is MIT licensed (see `LICENSE`). It uses [JUCE](https://juce.com) under the AGPLv3 /
-  JUCE licence.
+The software is licensed under [MIT](https://opensource.org/license/mit). See [LICENSE](LICENSE) for details and third-party notices.

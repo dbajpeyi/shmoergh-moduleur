@@ -21,7 +21,8 @@ public:
     static constexpr float kPanelHeight = 1210.0f;
 
 private:
-    // The panel in its native 968 x 1210 units; scaled as a whole.
+    // The panel in its native 968 x 1210 units. It sits inside the stage (the
+    // design's backdrop and handle), which the editor scales as a whole.
     struct Content : public juce::Component
     {
         std::function<void (const juce::MouseEvent&)> onPopup;
@@ -44,8 +45,10 @@ private:
 
     ModuleurProcessor& processor;
     moduleur::ui::ThemeLookAndFeel lookAndFeel;   // declared first: outlives the controls
+    Content stage;
+    moduleur::ui::StageBackground stageBackground;
     Content content;
-    moduleur::ui::PanelBackground background;
+    moduleur::ui::PanelBackground background;     // legacy panel looks only
     moduleur::ui::CableLayer cables;
     juce::TooltipWindow tooltips { this, 600 };
 
