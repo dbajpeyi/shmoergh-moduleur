@@ -92,8 +92,6 @@ How each module is modelled is described in [docs/DSP.md](docs/DSP.md). Maintain
 
 ## Licence
 
-Shmøergh Moduleur © 2026 Shmøergh
-
 The panel design and artwork are licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), like the Moduleur hardware.
 
 The software is licensed under [MIT](https://opensource.org/license/mit). See [LICENSE](LICENSE) for details and third-party notices.
