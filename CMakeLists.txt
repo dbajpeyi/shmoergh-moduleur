@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(ShmoerghModuleur VERSION 0.2.0 LANGUAGES C CXX)
+project(ShmoerghModuleur VERSION 0.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -58,6 +58,7 @@ juce_add_binary_data(ModuleurAssets
     NAMESPACE   ModuleurAssets
     SOURCES
         assets/design/stage@3x.png
+        assets/design/stage-light@3x.png
         assets/panel/silkscreen.svg
         assets/panel/copper.svg)
 

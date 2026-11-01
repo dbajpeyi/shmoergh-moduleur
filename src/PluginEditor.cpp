@@ -28,7 +28,7 @@ const char* kHelp =
     "PULSE in or the DAW transport), B range, C randomness. Hold 2 for swing / scale / length; "
     "double-tap and hold 2 to transpose.\n\n"
     "HOST L / HOST R carry the plugin's (sidechain) audio input.\n\n"
-    "Double-click a knob to reset it. Right-click the panel for size and patch options.";
+    "Double-click a knob to reset it. Right-click the panel for dark or light appearance, size and patch options.";
 } // namespace
 
 ModuleurEditor::ModuleurEditor (ModuleurProcessor& p)
@@ -179,7 +179,7 @@ ModuleurEditor::~ModuleurEditor()
 
 void ModuleurEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff090909));
+    g.fillAll (lookAndFeel.theme.light ? juce::Colour (0xfff8f8f7) : juce::Colour (0xff090909));
 }
 
 void ModuleurEditor::resized()
@@ -196,15 +196,19 @@ void ModuleurEditor::setScale (float s)
 
 void ModuleurEditor::applyTheme()
 {
-    // Only the Figma design is offered unless the legacy looks are compiled in.
+    // The design comes in dark and light; the legacy looks only when compiled in.
     const auto id = processor.uiState.getProperty ("theme", "figma").toString();
-    if (! kPanelThemesEnabled || id == "figma")
+    if (id == "figma-light")
+        lookAndFeel.theme = Theme::figmaLight();
+    else if (! kPanelThemesEnabled || id == "figma")
         lookAndFeel.theme = Theme::figma();
     else
         lookAndFeel.theme = id == "white" ? Theme::white() : (id == "black" ? Theme::black() : Theme::original());
     background.setTheme (lookAndFeel.theme);
     background.setVisible (! lookAndFeel.theme.design);
+    stageBackground.setLight (lookAndFeel.theme.light);
     stage.repaint();
+    repaint();
     const float opacity = (float) processor.uiState.getProperty ("cableOpacity", 0.9f);
     cables.setOpacity (std::isfinite (opacity) ? juce::jlimit (0.2f, 1.0f, opacity) : 0.9f);
 }
@@ -359,14 +363,16 @@ void ModuleurEditor::showMenu()
     {
         theme.addItem (name, true, themeId == id, [this, id] { processor.uiState.setProperty ("theme", id, nullptr); applyTheme(); });
     };
+    addTheme ("Dark", "figma");
+    addTheme ("Light", "figma-light");
     if (kPanelThemesEnabled)
     {
-        addTheme ("Moduleur design", "figma");
+        theme.addSeparator();
         addTheme ("Shaded hardware", "original");
         addTheme ("White FR4 (DIY panel)", "white");
         addTheme ("Black FR4 (DIY panel)", "black");
-        menu.addSubMenu ("Panel", theme);
     }
+    menu.addSubMenu ("Appearance", theme);
 
     juce::PopupMenu size;
     for (float s : { 0.45f, 0.55f, 0.62f, 0.75f, 0.9f, 1.1f })

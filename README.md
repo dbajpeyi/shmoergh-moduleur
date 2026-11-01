@@ -2,7 +2,10 @@
 
 The official software version of the [Shmøergh Moduleur](https://github.com/shmoergh/moduleur), the open-source analog modular synthesizer. Play it as an Audio Unit or VST3 instrument in your DAW, or on its own as a standalone app.
 
-![The Moduleur plugin](docs/screenshot.png)
+<p>
+  <img src="docs/screenshot.png" alt="The Moduleur plugin, dark appearance" width="49%">
+  <img src="docs/screenshot-light.png" alt="The Moduleur plugin, light appearance" width="49%">
+</p>
 
 The plugin has the same eight modules and the same front panel as the hardware. Every module is modelled from its published schematic, so it responds the way the circuits do: a 1 V/oct saw-core oscillator, a three-pole diode ladder filter that can scream into self-oscillation, RC envelopes, a JFET sample-and-hold "bitcrusher" and an LED-clipping output stage. It comes pre-patched like a Moduleur fitted with its default patch board. Play a note and it makes sound. Add patch cables to take it further.
 
@@ -50,7 +53,7 @@ A fresh instance also comes with two cables: Brain CV out to oscillator 1 PITCH,
 
 **Knobs and sliders.** Drag up and down. Double-click to reset. Every control can be automated from your DAW.
 
-**The menu.** Right-click the panel to resize the window, change cable opacity, switch the Brain's firmware, remove the default patch board, reset to the starting patch, or send a panic.
+**The menu.** Right-click the panel to switch between the dark and light appearance, resize the window, change cable opacity, switch the Brain's firmware, remove the default patch board, reset to the starting patch, or send a panic.
 
 ## The Brain
 

@@ -1,11 +1,11 @@
 # Panel art
 
-The plugin's background (`assets/design/stage@3x.png`) and its knob outlines (`src/ui/DesignParts.h`) are generated from the Figma design, exported as PDF into `source/`:
+The plugin's backgrounds (`assets/design/stage@3x.png` for dark, `assets/design/stage-light@3x.png` for light) and its knob outlines (`src/ui/DesignParts.h`) are generated from the Figma design, exported as PDF into `source/`:
 
 - `moduleur.pdf`: the full composition (backdrop, handle, panel, cables)
 - `panel.pdf`: the panel on its own
 
-The background keeps everything static (panel, print, hatching, jacks, screws, handle) and leaves out the cables and moving parts, which the plugin draws itself.
+Each background keeps everything static (panel, print, hatching, jacks, screws, handle) and leaves out the cables and moving parts, which the plugin draws itself. The light appearance is made from the same export: the hatched areas become solid red, green and navy blocks, and the colours are remapped to the white Moduleur.
 
 ## Regenerating
 
@@ -18,8 +18,10 @@ pdftocairo -svg source/moduleur.pdf build/moduleur.svg
 pdftocairo -svg source/panel.pdf build/panel.svg
 npm install --no-save playwright && npx playwright install chromium
 
-node make-stage.js build/moduleur.svg build/stage-raw@3x.png 3
-python3 host-labels.py build/stage-raw@3x.png ../../assets/design/stage@3x.png
+node make-stage.js build/moduleur.svg build/stage-raw@3x.png 3 dark
+python3 host-labels.py build/stage-raw@3x.png ../../assets/design/stage@3x.png dark
+node make-stage.js build/moduleur.svg build/stage-light-raw@3x.png 3 light
+python3 host-labels.py build/stage-light-raw@3x.png ../../assets/design/stage-light@3x.png light
 python3 extract-parts.py build/panel.svg ../../src/ui/DesignParts.h
 ```
 

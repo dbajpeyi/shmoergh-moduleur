@@ -91,6 +91,37 @@ void fillDesignCircle (juce::Graphics& g, juce::Point<float> centre, float radiu
 }
 } // namespace
 
+KnobColours knobColours (const Theme& t, int index)
+{
+    const auto& p = t.palette;
+    if (! t.light)
+    {
+        // Dark design: white caps, orange output levels.
+        if (index == P_MIX_MAIN || index == P_VOLUME)
+            return { juce::Colour (0xffff8700), p.cap };
+        return { p.cap, p.pointer };
+    }
+
+    // Light: knob colours of the white Moduleur.
+    const juce::Colour pink (0xfff2c9cc), green (0xff3e8a6a), red (0xffd9392f), navy (0xff0f1d3a), white = p.cap;
+    switch (index)
+    {
+        case P_ENV1_ATTACK: case P_ENV1_DECAY: case P_ENV1_RELEASE:
+        case P_VCF_RESO: case P_CRUSH:
+            return { pink, p.pointer };
+        case P_ENV2_ATTACK: case P_ENV2_DECAY: case P_ENV2_RELEASE:
+        case P_VCF_CV1: case P_VCF_CV2:
+        case P_BRAIN_X: case P_BRAIN_Y: case P_BRAIN_Z:
+            return { navy, white };
+        case P_MIX_MAIN: case P_VOLUME:
+            return { green, white };
+        case P_DRIVE:
+            return { red, white };
+        default:
+            return { white, p.pointer };
+    }
+}
+
 const Theme& themeOf (const juce::Component& c)
 {
     static const Theme fallback = Theme::original();
@@ -102,14 +133,25 @@ const Theme& themeOf (const juce::Component& c)
 //==============================================================================
 StageBackground::StageBackground()
 {
-    image = juce::ImageCache::getFromMemory (ModuleurAssets::stage3x_png, ModuleurAssets::stage3x_pngSize);
+    dark = juce::ImageCache::getFromMemory (ModuleurAssets::stage3x_png, ModuleurAssets::stage3x_pngSize);
+    light = juce::ImageCache::getFromMemory (ModuleurAssets::stagelight3x_png, ModuleurAssets::stagelight3x_pngSize);
     setInterceptsMouseClicks (false, false);
-    setBufferedToImage (true);   // re-rendered only when the editor is resized
+    setBufferedToImage (true);   // re-rendered only on resize or appearance change
+}
+
+void StageBackground::setLight (bool shouldBeLight)
+{
+    if (shouldBeLight != useLight)
+    {
+        useLight = shouldBeLight;
+        repaint();
+    }
 }
 
 void StageBackground::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff090909));
+    const auto& image = useLight ? light : dark;
+    g.fillAll (useLight ? juce::Colour (0xfff8f8f7) : juce::Colour (0xff090909));
     if (image.isValid())
     {
         g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
@@ -262,21 +304,25 @@ void Knob::paint (juce::Graphics& g)
 
     if (t.design)
     {
+        const auto& p = t.palette;
         if (kind == ControlKind::BigKnob)
         {
             // Cutoff: Ø58 pt cap with its pointer tab, rotating as one piece.
-            g.setColour (design::kCap);
-            g.fillPath (cutoffPath(), designTransform (c, angle));
+            const auto tf = designTransform (c, angle);
+            g.setColour (p.cap);
+            g.fillPath (cutoffPath(), tf);
+            g.setColour (p.outline);
+            g.strokePath (cutoffPath(), juce::PathStrokeType (1.4f), tf);
             return;
         }
-        // Trimmer: black Ø40 pt seat, scalloped Ø32 pt cap, 4 x 9 pt pointer bar.
-        const bool orange = paramIndex == P_MIX_MAIN || paramIndex == P_VOLUME;
-        fillDesignCircle (g, c, 20.0f, design::kRing);
-        g.setColour (orange ? design::kOrange : design::kCap);
+        // Trimmer: Ø40 pt seat, scalloped Ø32 pt cap, 4 x 9 pt pointer bar.
+        const auto colours = knobColours (t, paramIndex);
+        fillDesignCircle (g, c, 20.0f, p.ring);
+        g.setColour (colours.cap);
         g.fillPath (trimmerCapPath(), designTransform (c, angle));
         juce::Path bar;
         bar.addRoundedRectangle (-2.0f, -12.66f, 4.0f, 9.0f, 2.0f);
-        g.setColour (orange ? design::kCap : design::kPointer);
+        g.setColour (colours.pointer);
         g.fillPath (bar, designTransform (c, angle));
         return;
     }
@@ -363,7 +409,11 @@ void Fader::paint (juce::Graphics& g)
         // The slot is part of the panel art; the cap is a white Ø20 pt disc
         // travelling between the slot's rounded ends.
         const float yTop = b.getCentreY() - travel * 0.5f;
-        fillDesignCircle (g, { b.getCentreX(), yTop + (1.0f - pos) * travel }, 10.0f, design::kCap);
+        const juce::Point<float> capCentre { b.getCentreX(), yTop + (1.0f - pos) * travel };
+        fillDesignCircle (g, capCentre, 10.0f, t.palette.cap);
+        const float r = 10.0f * kPtToPanel;
+        g.setColour (t.palette.outline);
+        g.drawEllipse (capCentre.x - r, capCentre.y - r, r * 2.0f, r * 2.0f, 1.4f);
         return;
     }
     const float capH = 40.0f, capW = 26.0f;
@@ -471,9 +521,11 @@ void WaveSelector::paint (juce::Graphics& g)
         juce::Path body;
         body.addEllipse (-44.0f, -44.0f, 88.0f, 88.0f);
         body.addRectangle (38.0f, -4.0f, 18.0f, 8.0f);
-        g.setColour (design::kCap);
+        g.setColour (t.palette.cap);
         g.fillPath (body, designTransform (c, a));
-        fillDesignCircle (g, c, 12.0f, design::kPanel);
+        g.setColour (t.palette.outline);
+        g.strokePath (body, juce::PathStrokeType (1.4f), designTransform (c, a));
+        fillDesignCircle (g, c, 12.0f, t.palette.hole);
         return;
     }
 
@@ -537,8 +589,10 @@ void PushButton::paint (juce::Graphics& g)
     if (t.design)
     {
         // Black Ø44 pt bezel, grey Ø36 pt cap.
-        fillDesignCircle (g, c, 22.0f, design::kRing);
-        fillDesignCircle (g, c, 18.0f, down ? design::kButtonDown : design::kButton);
+        // Button 1 (the firmware's A, the one with the LED) and button 2 can differ.
+        const auto& p = t.palette;
+        fillDesignCircle (g, c, 22.0f, p.ring);
+        fillDesignCircle (g, c, 18.0f, down ? p.buttonDown : (hasLed ? p.button1 : p.button2));
         return;
     }
     const float r = 18.5f;
@@ -591,8 +645,8 @@ void PowerButton::paint (juce::Graphics& g)
     if (t.design)
     {
         // Black Ø40 pt bezel, grey Ø30 pt cap (darker when off).
-        fillDesignCircle (g, c, 20.0f, design::kRing);
-        fillDesignCircle (g, c, 15.0f, on ? design::kPowerOn : design::kPowerOff);
+        fillDesignCircle (g, c, 20.0f, t.palette.ring);
+        fillDesignCircle (g, c, 15.0f, on ? t.palette.powerOn : t.palette.powerOff);
         return;
     }
     const float r = 20.5f;
@@ -623,11 +677,11 @@ void LedLight::paint (juce::Graphics& g)
 {
     const auto c = getLocalBounds().toFloat().getCentre();
 
-    if (themeOf (*this).design)
+    if (const auto& t = themeOf (*this); t.design)
     {
-        // Black Ø16 pt seat, Ø12 pt lens from dark red to red.
-        fillDesignCircle (g, c, 8.0f, design::kRing);
-        fillDesignCircle (g, c, 6.0f, design::kLedOff.interpolatedWith (design::kLedOn, level));
+        // Ø16 pt seat, Ø12 pt lens fading from off to red.
+        fillDesignCircle (g, c, 8.0f, t.palette.ring);
+        fillDesignCircle (g, c, 6.0f, t.palette.ledOff.interpolatedWith (t.palette.ledOn, level));
         return;
     }
 
@@ -673,7 +727,7 @@ void Jack::paint (juce::Graphics& g)
         if (highlighted || (hover && patchable))
         {
             const float rr = 22.5f * kPtToPanel;
-            g.setColour ((highlighted ? juce::Colours::white : juce::Colours::white.withAlpha (0.45f)));
+            g.setColour (highlighted ? t.palette.highlight : t.palette.highlight.withAlpha (0.45f));
             g.drawEllipse (c.x - rr, c.y - rr, rr * 2.0f, rr * 2.0f, 1.6f);
         }
         return;
