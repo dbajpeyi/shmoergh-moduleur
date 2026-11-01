@@ -57,11 +57,13 @@ switch mutes the output.
 
 ## Installing on macOS
 
-### Pre-built (from CI)
+### Download
 
-Each push builds universal (Apple Silicon + Intel) binaries in GitHub Actions: open the latest run under
-**Actions → Build → Moduleur-macOS** and download the zips. Tagged releases (`v*`) attach them to a GitHub
-release.
+Get the zips from the [**Releases**](../../releases/latest) page (universal: Apple Silicon + Intel).
+Builds of every push are also on the **Actions → Build** run pages, as the **Moduleur-macOS** artifact.
+
+To publish a new release, bump `VERSION` in `CMakeLists.txt` and push a matching tag, e.g.
+`git tag v0.2.0 && git push origin v0.2.0`. CI builds, tests, validates the AU and attaches the zips.
 
 - `Moduleur.component` → `~/Library/Audio/Plug-Ins/Components/`
 - `Moduleur.vst3` → `~/Library/Audio/Plug-Ins/VST3/`

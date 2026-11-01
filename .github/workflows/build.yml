@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Tagged builds (v*) publish a GitHub Release with the macOS zips attached.
+permissions:
+  contents: write
+
 jobs:
   macos:
     name: macOS (AU / VST3 / Standalone, universal)
@@ -54,6 +58,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: Moduleur ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          generate_release_notes: true
           files: dist/*.zip
 
   linux:
