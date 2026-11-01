@@ -62,8 +62,9 @@ switch mutes the output.
 Get the zips from the [**Releases**](../../releases/latest) page (universal: Apple Silicon + Intel).
 Builds of every push are also on the **Actions → Build** run pages, as the **Moduleur-macOS** artifact.
 
-To publish a new release, bump `VERSION` in `CMakeLists.txt` and push a matching tag, e.g.
-`git tag v0.2.0 && git push origin v0.2.0`. CI builds, tests, validates the AU and attaches the zips.
+To publish a new release, bump `VERSION` in `CMakeLists.txt`, then either push a matching tag
+(`git tag v0.2.0 && git push origin v0.2.0`) or open **Actions → Build → Run workflow** on `main` and enter
+the version (e.g. `v0.2.0`). CI builds, tests, validates the AU, creates the tag and attaches the zips.
 
 - `Moduleur.component` → `~/Library/Audio/Plug-Ins/Components/`
 - `Moduleur.vst3` → `~/Library/Audio/Plug-Ins/VST3/`
