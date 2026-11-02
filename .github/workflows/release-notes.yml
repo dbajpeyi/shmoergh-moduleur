@@ -1,0 +1,48 @@
+name: Release notes
+
+# Rewrites the text of published releases from CHANGELOG.md without rebuilding
+# or touching their downloads. New releases get their notes from the Build
+# workflow; run this after editing the notes of a release that is already out.
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release to update (for example v1.0.0), or \"all\""
+        required: true
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  notes:
+    name: Update release notes
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0 # tags, for each release's own install notes
+          persist-credentials: false
+
+      - name: Update release notes
+        env:
+          # Passed through the environment, never pasted into the script.
+          RELEASE: ${{ inputs.release }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "$RELEASE" = "all" ]; then
+            tags="$(gh release list --limit 100 --json tagName --jq '.[].tagName')"
+          elif printf '%s' "$RELEASE" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            tags="$RELEASE"
+          else
+            echo "Release must look like v1.2.3 or be \"all\", got: $RELEASE" >&2
+            exit 1
+          fi
+          for tag in $tags; do
+            .github/scripts/release-notes.sh "$tag" > "$RUNNER_TEMP/notes.md"
+            gh release edit "$tag" --notes-file "$RUNNER_TEMP/notes.md"
+            echo "Updated $tag"
+          done

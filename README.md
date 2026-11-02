@@ -36,6 +36,8 @@ The plugin has the same eight modules and the same front panel as the hardware. 
 
 4. Restart your DAW. If Logic Pro doesn't list Moduleur, run `auval -v aumu Mdlr Shmo` in Terminal once.
 
+What changed in each version is listed in the [release notes](CHANGELOG.md).
+
 ## Playing
 
 Load **Moduleur** as an instrument and play. In the standalone app, choose your audio output and MIDI keyboard under **Options → Audio/MIDI Settings**.

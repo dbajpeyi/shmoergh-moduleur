@@ -109,6 +109,11 @@ jobs:
           fi
           echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Write release notes
+        env:
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: .github/scripts/release-notes.sh "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: Moduleur-macOS
@@ -119,5 +124,5 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: Moduleur ${{ steps.version.outputs.tag }}
-          body_path: .github/release-notes.md
+          body_path: ${{ runner.temp }}/release-notes.md
           files: dist/*

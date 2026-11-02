@@ -3,11 +3,14 @@
 ## Publishing a release
 
 1. Update `VERSION` in `CMakeLists.txt` (for example `1.0.0`).
-2. Publish it in one of two ways:
+2. Add a section for the version at the top of `CHANGELOG.md`, headed `## v1.0.0 — <date>`, saying what changed in plain words. The release fails if the section is missing.
+3. Publish it in one of two ways:
    - Push a matching tag: `git tag v1.0.0 && git push origin v1.0.0`
    - Or open **Actions → Build → Run workflow** on `main` and enter `v1.0.0`.
 
-The workflow builds and tests on macOS and Linux and validates the Audio Unit with `auval`. It then publishes a GitHub release with three zips (AU, VST3, Standalone) and a `SHA256SUMS.txt`, using `.github/release-notes.md` as the text.
+The workflow builds and tests on macOS and Linux and validates the Audio Unit with `auval`. It then publishes a GitHub release with three zips (AU, VST3, Standalone) and a `SHA256SUMS.txt`. Its text is the version's `CHANGELOG.md` section followed by the install notes in `.github/release-notes.md`.
+
+To fix the notes of a release that is already out, edit `CHANGELOG.md` on `main`, then open **Actions → Release notes → Run workflow** and enter the version, or `all`. This only rewrites the text; the downloads stay as they are.
 
 ## Before distributing on the website
 
